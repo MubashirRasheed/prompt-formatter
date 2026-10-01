@@ -134,7 +134,7 @@ export default function App() {
               event.preventDefault()
               void onUpload(event.dataTransfer.files?.[0])
             }}
-            placeholder="Paste prompts, or drop a .txt file. Glued numbers like 1. …2. [HOOK] are split onto new lines. Batch headers are removed."
+            placeholder="Paste prompts, or drop a .txt file. Blank lines become 1. 2. 3. if you did not number them. Glued numbers are split onto new lines."
             className="min-h-0 flex-1 resize-none bg-transparent px-6 pb-6 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-200 dark:placeholder:text-zinc-600"
             spellCheck={false}
           />
@@ -172,6 +172,7 @@ export default function App() {
               value={report.range ? `${report.range[0]}–${report.range[1]}` : '—'}
             />
             <Stat label="Split onto new line" value={String(report.gluedMoved)} />
+            <Stat label="Numbers added" value={String(report.numbersAdded)} />
             <Stat label="Batch headers removed" value={String(report.batchesRemoved)} />
             <Stat
               label="Missing"

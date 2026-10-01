@@ -8,11 +8,13 @@ export type FormatReport = {
   blanksAdded: number
   batchesRemoved: number
   spacesAdded: number
+  numbersAdded: number
 }
 
 const TAG = 'HOOK|BUILD|INTERRUPT|PEAK|RESOLVE'
 const PROMPT_SOURCE = `(?<!\\d)(\\d{1,4})\\.\\s*(\\[(?:${TAG})\\])`
 const LINE_PROMPT = new RegExp(`^(\\d{1,4})\\.\\s+\\[(?:${TAG})\\]`, 'i')
+const ANY_NUMBERED = /^(\d{1,4})\.\s/
 const BATCH_SOURCE = '\\*{0,2}\\s*Batch\\s+\\d+\\s+of\\s+\\d+(?:\\s*\\([^)\\n]*\\))?\\s*\\*{0,2}'
 
 function stripBatches(raw: string): { text: string; removed: number } {
@@ -70,6 +72,39 @@ function splitOntoOwnLines(text: string): {
   return { text: out, gluedMoved, spacesAdded }
 }
 
+function addNumbersIfMissing(text: string): { text: string; numbersAdded: number } {
+  const already =
+    new RegExp(PROMPT_SOURCE, 'i').test(text) ||
+    text.split('\n').some((line) => /^\s*\d{1,4}\./.test(line))
+  if (already) return { text, numbersAdded: 0 }
+
+  const lines = text.split('\n')
+  const tagStart = new RegExp(`^\\s*\\[(?:${TAG})\\]`, 'i')
+  const blocks: string[] = []
+  let current: string[] = []
+  const flush = () => {
+    const block = current.join('\n').trim()
+    if (block) blocks.push(block)
+    current = []
+  }
+
+  for (const line of lines) {
+    if (line.trim() === '') flush()
+    else if (current.length && tagStart.test(line)) {
+      flush()
+      current.push(line)
+    } else current.push(line)
+  }
+  flush()
+
+  if (!blocks.length) return { text, numbersAdded: 0 }
+
+  return {
+    text: blocks.map((block, index) => `${index + 1}. ${block}`).join('\n\n'),
+    numbersAdded: blocks.length,
+  }
+}
+
 function separatePromptLines(text: string): { text: string; blanksAdded: number } {
   const lines = text.split('\n')
   const out: string[] = []
@@ -90,7 +125,7 @@ function separatePromptLines(text: string): { text: string; blanksAdded: number 
 function collectNumbers(text: string): number[] {
   const numbers: number[] = []
   for (const line of text.split('\n')) {
-    const match = line.match(LINE_PROMPT)
+    const match = line.match(ANY_NUMBERED)
     if (match) numbers.push(Number(match[1]))
   }
   return numbers
@@ -98,7 +133,8 @@ function collectNumbers(text: string): number[] {
 
 export function formatPrompts(raw: string): FormatReport {
   const stripped = stripBatches(raw)
-  const split = splitOntoOwnLines(stripped.text)
+  const numbered = addNumbersIfMissing(stripped.text)
+  const split = splitOntoOwnLines(numbered.text)
   const separated = separatePromptLines(split.text)
   const text = separated.text.trim() ? `${separated.text.replace(/\s+$/, '')}\n` : ''
   const numbers = collectNumbers(text)
@@ -123,6 +159,7 @@ export function formatPrompts(raw: string): FormatReport {
     blanksAdded: separated.blanksAdded,
     batchesRemoved: stripped.removed,
     spacesAdded: split.spacesAdded,
+    numbersAdded: numbered.numbersAdded,
   }
 }
 

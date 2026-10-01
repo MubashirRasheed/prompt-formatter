@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #fafafa;
+  color: #18181b;
+  font-family: 'Atkinson Hyperlegible', ui-sans-serif, system-ui, sans-serif;
+}
+
+html.dark body {
+  background: #09090b;
+  color: #fafafa;
+}
+
+textarea,
+pre {
+  font-family: 'Atkinson Hyperlegible', ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}

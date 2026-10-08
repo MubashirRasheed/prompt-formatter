@@ -167,6 +167,41 @@ describe('formatPrompts numbering and cleanup', () => {
   })
 })
 
+describe('visual nanobanana blocks', () => {
+  it('keeps only the prompt and numbers it from the visual heading', () => {
+    const report = formatPrompts(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VISUAL 001
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Script: "Sor Josefa Menéndez vio, en tres momentos distintos,"
+Concept: The weight of a witness.
+Style: 1 — Byzantine-Renaissance Icon
+Camera: MEDIUM-WIDE FULL FIGURE
+Reference images to attach: Sor Josefa Menéndez, Jesucristo
+
+NANOBANANA PROMPT:
+A stunning Byzantine-Renaissance icon colorful painting.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VISUAL 002
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Script: "el instante exacto."
+Concept: The silence of a choice.
+
+NANOBANANA PROMPT:
+A highly detailed dramatic chiaroscuro oil colorful painting.
+`)
+
+    expect(report.text).toBe(`1. A stunning Byzantine-Renaissance icon colorful painting.
+
+2. A highly detailed dramatic chiaroscuro oil colorful painting.
+`)
+    expect(report.count).toBe(2)
+    expect(report.range).toEqual([1, 2])
+    expect(report.missing).toEqual([])
+    expect(report.text).not.toMatch(/Script:|Concept:|Camera:|VISUAL|NANOBANANA/)
+  })
+})
+
 describe('downloadName', () => {
   it('adds .txt when the name has no extension', () => {
     expect(downloadName('atlas')).toBe('atlas.txt')

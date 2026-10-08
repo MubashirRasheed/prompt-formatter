@@ -163,7 +163,87 @@ function collectNumbers(text: string): number[] {
   return numbers
 }
 
+const VISUAL_HEADING = /^VISUAL\s+(\d{1,4})\s*$/i
+const NANO_LABEL = /^NANOBANANA PROMPT:\s*(.*)$/i
+
+function isRuleLine(line: string): boolean {
+  const trimmed = line.trim()
+  return trimmed.length >= 3 && /^[━─—\-_=*]+$/.test(trimmed)
+}
+
+function extractVisualPrompts(raw: string): FormatReport | null {
+  const lines = raw.replace(/^\uFEFF/, '').split(/\r?\n/)
+  if (!lines.some((line) => NANO_LABEL.test(line.trim()))) return null
+
+  const prompts: { number: number; text: string }[] = []
+  let visualNumber: number | null = null
+  let collecting = false
+  let body: string[] = []
+
+  const finish = () => {
+    const text = body.join('\n').trim()
+    if (visualNumber !== null && text) prompts.push({ number: visualNumber, text })
+    body = []
+    collecting = false
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    const visual = trimmed.match(VISUAL_HEADING)
+    if (visual) {
+      finish()
+      visualNumber = Number(visual[1])
+      continue
+    }
+    if (isRuleLine(trimmed)) {
+      if (collecting) finish()
+      continue
+    }
+    const label = trimmed.match(NANO_LABEL)
+    if (label) {
+      if (collecting) finish()
+      collecting = true
+      if (label[1].trim()) body.push(label[1].trim())
+      if (visualNumber === null) visualNumber = prompts.length + 1
+      continue
+    }
+    if (collecting) body.push(line)
+  }
+  finish()
+
+  const numbers = prompts.map((prompt) => prompt.number)
+  const unique = [...new Set(numbers)]
+  const low = numbers.length ? Math.min(...numbers) : null
+  const high = numbers.length ? Math.max(...numbers) : null
+  const missing =
+    low === null || high === null
+      ? []
+      : Array.from({ length: high - low + 1 }, (_, i) => low + i).filter(
+          (n) => !unique.includes(n),
+        )
+  const duplicates = unique.filter((n) => numbers.filter((x) => x === n).length > 1)
+  const text = prompts.length
+    ? `${prompts.map((prompt) => `${prompt.number}. ${prompt.text}`).join('\n\n')}\n`
+    : ''
+
+  return {
+    text,
+    count: numbers.length,
+    range: low === null || high === null ? null : [low, high],
+    missing,
+    duplicates,
+    gluedMoved: 0,
+    blanksAdded: 0,
+    batchesRemoved: 0,
+    spacesAdded: 0,
+    numbersAdded: numbers.length,
+  }
+}
+
 export function formatPrompts(raw: string): FormatReport {
+  const visuals = extractVisualPrompts(raw)
+  if (visuals) return visuals
+
   const stripped = stripBatches(raw)
   const numbered = addNumbersIfMissing(stripped.text)
   const split = splitOntoOwnLines(numbered.text)

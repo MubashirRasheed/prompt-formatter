@@ -54,6 +54,30 @@ third block with no tag`)
 `)
   })
 
+  it('numbers a bare tag that comes after numbered prompts', () => {
+    const report = formatPrompts(`29. [BUILD] first
+
+30. [BUILD] second
+
+[BUILD] third prompt
+[INTERRUPT] fourth prompt
+[BUILD] fifth prompt`)
+
+    expect(report.text).toBe(`29. [BUILD] first
+
+30. [BUILD] second
+
+31. [BUILD] third prompt
+
+32. [INTERRUPT] fourth prompt
+
+33. [BUILD] fifth prompt
+`)
+    expect(report.numbersAdded).toBe(3)
+    expect(report.missing).toEqual([])
+    expect(blankLinesBetweenPrompts(report.text)).toEqual([1, 1, 1, 1])
+  })
+
   it('inserts one blank line when numbered prompts are back to back', () => {
     const report = formatPrompts(`1. [HOOK] first
 2. [BUILD] second
@@ -114,6 +138,22 @@ describe('formatPrompts numbering and cleanup', () => {
     expect(report.range).toEqual([1, 4])
     expect(report.missing).toEqual([])
     expect(blankLinesBetweenPrompts(report.text)).toEqual([1, 1, 1])
+  })
+
+  it('removes a batch line that ends with complete, and a bold batch line', () => {
+    const report = formatPrompts(`1. [HOOK] first
+  Batch 4 of 9 complete.
+
+
+**Batch 5 of 9**
+2. [BUILD] second`)
+
+    expect(report.batchesRemoved).toBe(2)
+    expect(report.text).toBe(`1. [HOOK] first
+
+2. [BUILD] second
+`)
+    expect(report.text).not.toMatch(/complete|Batch/i)
   })
 
   it('lists missing numbers as collapsed ranges', () => {

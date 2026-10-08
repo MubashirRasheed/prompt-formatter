@@ -15,7 +15,29 @@ export default function App() {
   const [copied, setCopied] = useState(false)
   const [theme, setTheme] = useState<Theme>('light')
   const fileRef = useRef<HTMLInputElement>(null)
+  const sourceRef = useRef<HTMLTextAreaElement>(null)
+  const outputRef = useRef<HTMLPreElement>(null)
+  const syncing = useRef<'source' | 'output' | null>(null)
   const report = useMemo(() => formatPrompts(source), [source])
+
+  function syncScroll(from: 'source' | 'output') {
+    const sourceEl = sourceRef.current
+    const outputEl = outputRef.current
+    if (!sourceEl || !outputEl) return
+    if (syncing.current && syncing.current !== from) return
+
+    const origin = from === 'source' ? sourceEl : outputEl
+    const target = from === 'source' ? outputEl : sourceEl
+    const originMax = origin.scrollHeight - origin.clientHeight
+    const targetMax = target.scrollHeight - target.clientHeight
+    if (originMax <= 0 || targetMax <= 0) return
+
+    syncing.current = from
+    target.scrollTop = (origin.scrollTop / originMax) * targetMax
+    requestAnimationFrame(() => {
+      if (syncing.current === from) syncing.current = null
+    })
+  }
 
   useEffect(() => {
     const saved = localStorage.getItem('prompt-formatter-theme')
@@ -59,7 +81,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4 dark:border-white/10">
         <div>
           <p className="text-[11px] font-medium tracking-[0.22em] text-zinc-500 uppercase">
@@ -91,8 +113,8 @@ export default function App() {
         </div>
       </header>
 
-      <main className="grid min-h-0 flex-1 gap-0 lg:grid-cols-2">
-        <section className="flex min-h-[420px] flex-col border-b border-zinc-200 lg:border-r lg:border-b-0 dark:border-white/10">
+      <main className="grid min-h-0 flex-1 grid-rows-2 overflow-hidden lg:grid-cols-2 lg:grid-rows-1">
+        <section className="flex min-h-0 flex-col overflow-hidden border-b border-zinc-200 lg:border-r lg:border-b-0 dark:border-white/10">
           <div className="flex items-center justify-between gap-3 px-6 py-3">
             <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
               <FileText className="size-4" />
@@ -127,20 +149,22 @@ export default function App() {
             </div>
           </div>
           <textarea
+            ref={sourceRef}
             value={source}
             onChange={(event) => setSource(event.target.value)}
+            onScroll={() => syncScroll('source')}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault()
               void onUpload(event.dataTransfer.files?.[0])
             }}
             placeholder="Paste prompts, or drop a .txt file. Blank lines become 1. 2. 3. if you did not number them. Glued numbers are split onto new lines."
-            className="min-h-0 flex-1 resize-none bg-transparent px-6 pb-6 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-200 dark:placeholder:text-zinc-600"
+            className="min-h-0 flex-1 resize-none overflow-auto bg-transparent px-6 pb-6 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-200 dark:placeholder:text-zinc-600"
             spellCheck={false}
           />
         </section>
 
-        <section className="flex min-h-[420px] flex-col bg-zinc-100/80 dark:bg-zinc-950/60">
+        <section className="flex min-h-0 flex-col overflow-hidden bg-zinc-100/80 dark:bg-zinc-950/60">
           <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Formatted</p>
             <div className="flex gap-2">
@@ -181,7 +205,11 @@ export default function App() {
             />
           </div>
 
-          <pre className="min-h-0 flex-1 overflow-auto px-6 pb-6 whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">
+          <pre
+            ref={outputRef}
+            onScroll={() => syncScroll('output')}
+            className="min-h-0 flex-1 overflow-auto px-6 pb-6 whitespace-pre-wrap text-zinc-900 dark:text-zinc-100"
+          >
             {report.text || (
               <span className="text-zinc-400 dark:text-zinc-600">Formatted prompts show up here.</span>
             )}

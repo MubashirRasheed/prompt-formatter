@@ -15,7 +15,8 @@ const TAG = 'HOOK|BUILD|INTERRUPT|PEAK|RESOLVE'
 const PROMPT_SOURCE = `(?<!\\d)(\\d{1,4})\\.\\s*(\\[(?:${TAG})\\])`
 const LINE_PROMPT = new RegExp(`^(\\d{1,4})\\.\\s+\\[(?:${TAG})\\]`, 'i')
 const ANY_NUMBERED = /^(\d{1,4})\.\s/
-const BATCH_SOURCE = '\\*{0,2}\\s*Batch\\s+\\d+\\s+of\\s+\\d+(?:\\s*\\([^)\\n]*\\))?\\s*\\*{0,2}'
+const BATCH_SOURCE =
+  '\\*{0,2}\\s*Batch\\s+\\d+\\s+of\\s+\\d+(?:\\s*\\([^)\\n]*\\))?(?:\\s*\\*{1,2})?(?:\\s+complete[.!]?)?\\s*\\*{0,2}'
 
 function stripBatches(raw: string): { text: string; removed: number } {
   let removed = 0
@@ -72,11 +73,42 @@ function splitOntoOwnLines(text: string): {
   return { text: out, gluedMoved, spacesAdded }
 }
 
+function numberBareTagLines(text: string): { text: string; numbersAdded: number } {
+  const numberedPrompt = new RegExp(`^\\s*(\\d{1,4})\\.\\s*\\[(?:${TAG})\\]`, 'i')
+  const bareTag = new RegExp(`^\\s*\\[(?:${TAG})\\]`, 'i')
+  const used = new Set<number>()
+
+  for (const line of text.split('\n')) {
+    const match = line.match(numberedPrompt)
+    if (match) used.add(Number(match[1]))
+  }
+
+  let last = 0
+  let numbersAdded = 0
+  const lines = text.split('\n').map((line) => {
+    const match = line.match(numberedPrompt)
+    if (match) {
+      last = Number(match[1])
+      return line
+    }
+    if (!bareTag.test(line)) return line
+
+    let next = last + 1
+    while (used.has(next)) next += 1
+    used.add(next)
+    last = next
+    numbersAdded += 1
+    return `${next}. ${line.trim()}`
+  })
+
+  return { text: lines.join('\n'), numbersAdded }
+}
+
 function addNumbersIfMissing(text: string): { text: string; numbersAdded: number } {
   const already =
     new RegExp(PROMPT_SOURCE, 'i').test(text) ||
     text.split('\n').some((line) => /^\s*\d{1,4}\./.test(line))
-  if (already) return { text, numbersAdded: 0 }
+  if (already) return numberBareTagLines(text)
 
   const lines = text.split('\n')
   const tagStart = new RegExp(`^\\s*\\[(?:${TAG})\\]`, 'i')

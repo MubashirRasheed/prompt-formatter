@@ -293,7 +293,9 @@ export function formatMissing(missing: number[]): string {
   return ranges.join(', ')
 }
 
-export function downloadName(name: string): string {
+export function downloadName(name: string, extension: 'txt' | 'pdf' = 'txt'): string {
   const trimmed = name.trim() || 'prompts'
-  return trimmed.toLowerCase().endsWith('.txt') ? trimmed : `${trimmed}.txt`
+  if (extension === 'txt' && trimmed.toLowerCase().endsWith('.txt')) return trimmed
+  const stem = trimmed.replace(/\.(txt|pdf)$/i, '') || 'prompts'
+  return `${stem}.${extension}`
 }

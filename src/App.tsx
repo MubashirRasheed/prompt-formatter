@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Download, FileText, Moon, Sun, Upload } from 'lucide-react'
+import { buildPdf } from './lib/build-pdf'
 import { downloadName, formatMissing, formatPrompts } from './lib/format-prompts'
 import { formatSegments } from './lib/format-segments'
 
@@ -99,13 +100,16 @@ export default function App() {
     window.setTimeout(() => setCopied(false), 1400)
   }
 
-  function downloadOutput() {
+  function downloadOutput(extension: 'txt' | 'pdf') {
     if (!report.text) return
-    const blob = new Blob([report.text], { type: 'text/plain;charset=utf-8' })
+    const blob =
+      extension === 'pdf'
+        ? buildPdf(report.text)
+        : new Blob([report.text], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = downloadName(fileName)
+    link.download = downloadName(fileName, extension)
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -222,12 +226,21 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={downloadOutput}
+                onClick={() => downloadOutput('txt')}
                 disabled={!report.text}
                 className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-amber-200 dark:text-zinc-950 dark:hover:bg-amber-100"
               >
                 <Download className="size-3.5" />
-                Download
+                TXT
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadOutput('pdf')}
+                disabled={!report.text}
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-40 dark:border-white/10 dark:bg-transparent dark:text-zinc-200 dark:hover:bg-white/5"
+              >
+                <Download className="size-3.5" />
+                PDF
               </button>
             </div>
           </div>

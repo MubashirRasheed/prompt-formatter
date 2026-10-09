@@ -207,5 +207,7 @@ describe('downloadName', () => {
     expect(downloadName('atlas')).toBe('atlas.txt')
     expect(downloadName('atlas.TXT')).toBe('atlas.TXT')
     expect(downloadName('  ')).toBe('prompts.txt')
+    expect(downloadName('prompts.txt', 'pdf')).toBe('prompts.pdf')
+    expect(downloadName('segments', 'pdf')).toBe('segments.pdf')
   })
 })

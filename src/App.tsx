@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Download, FileText, Moon, Sun, Upload } from 'lucide-react'
 import { buildPdf } from './lib/build-pdf'
 import { downloadName, formatMissing, formatPrompts } from './lib/format-prompts'
+import { formatScript } from './lib/format-script'
 import { formatSegments } from './lib/format-segments'
 
 const PROMPT_SAMPLE = `1. [HOOK] elbow jabs in2. [HOOK] steam near the ear
@@ -20,26 +21,35 @@ CONCEPT: The next line of the same scene.
 ADDRESS: N
 → Style 5 | Camera WIDE FULL SCENE | Temp Cool | Motion M6 | Contrast: Temperature, Tonal weight`
 
+const SCRIPT_SAMPLE = `Santa Faustina escribió que las almas tibias le causan a Jesús un dolor más agudo. [HOOK] Lo anotó en su Diario. [CORE REVEAL] Una alma tibia no es alguien que odia a Dios.
+
+[LOOP 1 CLOSE] Lo que cambia es esto. [SCRIPTURE: Apocalipsis 3:15-16] Esto no es una idea nueva.`
+
 type Theme = 'light' | 'dark'
-type Mode = 'prompts' | 'segments'
+type Mode = 'prompts' | 'segments' | 'script'
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('prompts')
   const [promptSource, setPromptSource] = useState('')
   const [segmentSource, setSegmentSource] = useState('')
+  const [scriptSource, setScriptSource] = useState('')
   const [promptFile, setPromptFile] = useState('prompts.txt')
   const [segmentFile, setSegmentFile] = useState('segments.txt')
+  const [scriptFile, setScriptFile] = useState('script.txt')
   const [copied, setCopied] = useState(false)
   const [theme, setTheme] = useState<Theme>('light')
   const fileRef = useRef<HTMLInputElement>(null)
   const sourceRef = useRef<HTMLTextAreaElement>(null)
   const outputRef = useRef<HTMLPreElement>(null)
   const syncing = useRef<'source' | 'output' | null>(null)
-  const source = mode === 'prompts' ? promptSource : segmentSource
-  const fileName = mode === 'prompts' ? promptFile : segmentFile
+  const source =
+    mode === 'prompts' ? promptSource : mode === 'segments' ? segmentSource : scriptSource
+  const fileName = mode === 'prompts' ? promptFile : mode === 'segments' ? segmentFile : scriptFile
   const promptReport = useMemo(() => formatPrompts(promptSource), [promptSource])
   const segmentReport = useMemo(() => formatSegments(segmentSource), [segmentSource])
-  const report = mode === 'prompts' ? promptReport : segmentReport
+  const scriptReport = useMemo(() => formatScript(scriptSource), [scriptSource])
+  const outputText =
+    mode === 'prompts' ? promptReport.text : mode === 'segments' ? segmentReport.text : scriptReport.text
 
   function syncScroll(from: 'source' | 'output') {
     const sourceEl = sourceRef.current
@@ -78,12 +88,14 @@ export default function App() {
 
   function setSource(text: string) {
     if (mode === 'prompts') setPromptSource(text)
-    else setSegmentSource(text)
+    else if (mode === 'segments') setSegmentSource(text)
+    else setScriptSource(text)
   }
 
   function setFileName(text: string) {
     if (mode === 'prompts') setPromptFile(text)
-    else setSegmentFile(text)
+    else if (mode === 'segments') setSegmentFile(text)
+    else setScriptFile(text)
   }
 
   async function onUpload(file: File | undefined) {
@@ -94,18 +106,18 @@ export default function App() {
   }
 
   async function copyOutput() {
-    if (!report.text) return
-    await navigator.clipboard.writeText(report.text)
+    if (!outputText) return
+    await navigator.clipboard.writeText(outputText)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1400)
   }
 
   function downloadOutput(extension: 'txt' | 'pdf') {
-    if (!report.text) return
+    if (!outputText) return
     const blob =
       extension === 'pdf'
-        ? buildPdf(report.text)
-        : new Blob([report.text], { type: 'text/plain;charset=utf-8' })
+        ? buildPdf(outputText)
+        : new Blob([outputText], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -122,7 +134,11 @@ export default function App() {
             Prompt formatter
           </p>
           <h1 className="text-lg font-medium tracking-tight text-zinc-950 dark:text-zinc-50">
-            {mode === 'prompts' ? 'One prompt per line' : 'One segment per block'}
+            {mode === 'prompts'
+              ? 'One prompt per line'
+              : mode === 'segments'
+                ? 'One segment per block'
+                : 'Script without markers'}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -154,6 +170,9 @@ export default function App() {
         <Tab active={mode === 'segments'} onClick={() => setMode('segments')}>
           Segments
         </Tab>
+        <Tab active={mode === 'script'} onClick={() => setMode('script')}>
+          Script
+        </Tab>
       </div>
 
       <main className="grid min-h-0 flex-1 grid-rows-2 overflow-hidden lg:grid-cols-2 lg:grid-rows-1">
@@ -166,7 +185,11 @@ export default function App() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setSource(mode === 'prompts' ? PROMPT_SAMPLE : SEGMENT_SAMPLE)}
+                onClick={() =>
+                  setSource(
+                    mode === 'prompts' ? PROMPT_SAMPLE : mode === 'segments' ? SEGMENT_SAMPLE : SCRIPT_SAMPLE,
+                  )
+                }
                 className="rounded-lg px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-100"
               >
                 Sample
@@ -204,7 +227,9 @@ export default function App() {
             placeholder={
               mode === 'prompts'
                 ? 'Paste prompts, or drop a .txt file. VISUAL blocks keep only the Nanobanana prompt and take their number from VISUAL 001. Blank lines become 1. 2. 3. if you did not number them.'
-                : 'Paste SEG 001 blocks. The right side keeps only the spoken line, as SEG 01: …'
+                : mode === 'segments'
+                  ? 'Paste SEG 001 blocks. The right side keeps only the spoken line, as SEG 01: …'
+                  : 'Paste a script. Anything in square brackets, like [HOOK] or [SCRIPTURE: Apocalipsis 3:15-16], is removed.'
             }
             className="min-h-0 flex-1 resize-none overflow-auto bg-transparent px-6 pb-6 text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-200 dark:placeholder:text-zinc-600"
             spellCheck={false}
@@ -218,7 +243,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => void copyOutput()}
-                disabled={!report.text}
+                disabled={!outputText}
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-800 hover:bg-zinc-50 disabled:opacity-40 dark:border-white/10 dark:bg-transparent dark:text-zinc-200 dark:hover:bg-white/5"
               >
                 <Copy className="size-3.5" />
@@ -227,7 +252,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => downloadOutput('txt')}
-                disabled={!report.text}
+                disabled={!outputText}
                 className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-amber-200 dark:text-zinc-950 dark:hover:bg-amber-100"
               >
                 <Download className="size-3.5" />
@@ -236,7 +261,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => downloadOutput('pdf')}
-                disabled={!report.text}
+                disabled={!outputText}
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-40 dark:border-white/10 dark:bg-transparent dark:text-zinc-200 dark:hover:bg-white/5"
               >
                 <Download className="size-3.5" />
@@ -246,23 +271,38 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap gap-2 px-6 pb-3">
-            <Stat label={mode === 'prompts' ? 'Prompts' : 'Segments'} value={String(report.count)} />
-            <Stat
-              label="Range"
-              value={report.range ? `${report.range[0]}–${report.range[1]}` : '—'}
-            />
-            {mode === 'prompts' ? (
+            {mode === 'script' ? (
+              <Stat label="Tags removed" value={String(scriptReport.tagsRemoved)} />
+            ) : mode === 'prompts' ? (
               <>
+                <Stat label="Prompts" value={String(promptReport.count)} />
+                <Stat
+                  label="Range"
+                  value={promptReport.range ? `${promptReport.range[0]}–${promptReport.range[1]}` : '—'}
+                />
                 <Stat label="Split onto new line" value={String(promptReport.gluedMoved)} />
                 <Stat label="Numbers added" value={String(promptReport.numbersAdded)} />
                 <Stat label="Batch headers removed" value={String(promptReport.batchesRemoved)} />
+                <Stat
+                  label="Missing"
+                  value={formatMissing(promptReport.missing)}
+                  warn={promptReport.missing.length > 0}
+                />
               </>
-            ) : null}
-            <Stat
-              label="Missing"
-              value={formatMissing(report.missing)}
-              warn={report.missing.length > 0}
-            />
+            ) : (
+              <>
+                <Stat label="Segments" value={String(segmentReport.count)} />
+                <Stat
+                  label="Range"
+                  value={segmentReport.range ? `${segmentReport.range[0]}–${segmentReport.range[1]}` : '—'}
+                />
+                <Stat
+                  label="Missing"
+                  value={formatMissing(segmentReport.missing)}
+                  warn={segmentReport.missing.length > 0}
+                />
+              </>
+            )}
           </div>
 
           <pre
@@ -270,9 +310,13 @@ export default function App() {
             onScroll={() => syncScroll('output')}
             className="min-h-0 flex-1 overflow-auto px-6 pb-6 whitespace-pre-wrap text-zinc-900 dark:text-zinc-100"
           >
-            {report.text || (
+            {outputText || (
               <span className="text-zinc-400 dark:text-zinc-600">
-                {mode === 'prompts' ? 'Formatted prompts show up here.' : 'Formatted segments show up here.'}
+                {mode === 'prompts'
+                  ? 'Formatted prompts show up here.'
+                  : mode === 'segments'
+                    ? 'Formatted segments show up here.'
+                    : 'The script without bracket tags shows up here.'}
               </span>
             )}
           </pre>

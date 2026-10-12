@@ -165,6 +165,8 @@ function collectNumbers(text: string): number[] {
 
 const VISUAL_HEADING = /^VISUAL\s+(\d{1,4})\s*$/i
 const NANO_LABEL = /^NANOBANANA PROMPT:\s*(.*)$/i
+const SEG_MARKED =
+  /^\s*\*?\s*\[\s*SEG\s+(\d{1,4})\s*[—–\-:]*\s*(?:[“"«'][\s\S]*?[”"»']\s*)?\]\s*\*?\s*(.*)$/i
 
 function isRuleLine(line: string): boolean {
   const trimmed = line.trim()
@@ -240,9 +242,75 @@ function extractVisualPrompts(raw: string): FormatReport | null {
   }
 }
 
+function reportNumbered(prompts: { number: number; text: string }[]): FormatReport {
+  const numbers = prompts.map((prompt) => prompt.number)
+  const unique = [...new Set(numbers)]
+  const low = numbers.length ? Math.min(...numbers) : null
+  const high = numbers.length ? Math.max(...numbers) : null
+  const missing =
+    low === null || high === null
+      ? []
+      : Array.from({ length: high - low + 1 }, (_, i) => low + i).filter(
+          (n) => !unique.includes(n),
+        )
+  const duplicates = unique.filter((n) => numbers.filter((x) => x === n).length > 1)
+  const text = prompts.length
+    ? `${prompts.map((prompt) => `${prompt.number}. ${prompt.text}`).join('\n\n')}\n`
+    : ''
+
+  return {
+    text,
+    count: numbers.length,
+    range: low === null || high === null ? null : [low, high],
+    missing,
+    duplicates,
+    gluedMoved: 0,
+    blanksAdded: 0,
+    batchesRemoved: 0,
+    spacesAdded: 0,
+    numbersAdded: numbers.length,
+  }
+}
+
+function extractSegMarkedPrompts(raw: string): FormatReport | null {
+  const lines = raw.replace(/^\uFEFF/, '').split(/\r?\n/)
+  if (!lines.some((line) => SEG_MARKED.test(line))) return null
+
+  const prompts: { number: number; text: string }[] = []
+  let current: { number: number; parts: string[] } | null = null
+
+  const finish = () => {
+    if (!current) return
+    const text = current.parts.join('\n').trim()
+    if (text) prompts.push({ number: current.number, text })
+    current = null
+  }
+
+  for (const line of lines) {
+    const match = line.match(SEG_MARKED)
+    if (match) {
+      finish()
+      current = { number: Number(match[1]), parts: [] }
+      if (match[2].trim()) current.parts.push(match[2].trim())
+      continue
+    }
+    if (!line.trim()) {
+      finish()
+      continue
+    }
+    if (current) current.parts.push(line)
+  }
+  finish()
+
+  return reportNumbered(prompts)
+}
+
 export function formatPrompts(raw: string): FormatReport {
   const visuals = extractVisualPrompts(raw)
   if (visuals) return visuals
+
+  const segMarked = extractSegMarkedPrompts(raw)
+  if (segMarked) return segMarked
 
   const stripped = stripBatches(raw)
   const numbered = addNumbersIfMissing(stripped.text)

@@ -202,6 +202,25 @@ A highly detailed dramatic chiaroscuro oil colorful painting.
   })
 })
 
+describe('seg-marked image prompts', () => {
+  it('drops the leading SEG quote marker and numbers from the SEG index', () => {
+    const report = formatPrompts(
+      `*[SEG 001 — "¿Por qué querría un alma entrar al purgatorio,"]* A grand Renaissance fresco ceiling colorful painting, variant ARRIVAL.
+
+*[SEG 003 — "She knelt at Communion."]* A second painted prompt.`,
+    )
+
+    expect(report.text).toBe(`1. A grand Renaissance fresco ceiling colorful painting, variant ARRIVAL.
+
+3. A second painted prompt.
+`)
+    expect(report.text).not.toMatch(/SEG 00|purgatorio|She knelt/)
+    expect(report.count).toBe(2)
+    expect(report.range).toEqual([1, 3])
+    expect(report.missing).toEqual([2])
+  })
+})
+
 describe('downloadName', () => {
   it('adds .txt when the name has no extension', () => {
     expect(downloadName('atlas')).toBe('atlas.txt')

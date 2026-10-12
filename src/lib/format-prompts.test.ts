@@ -156,6 +156,34 @@ describe('formatPrompts numbering and cleanup', () => {
     expect(report.text).not.toMatch(/complete|Batch/i)
   })
 
+  it('removes a batch header wrapped in underscores', () => {
+    const report = formatPrompts(`1. [HOOK] first
+___Batch 2 of 4 (segments 1-10)___
+2. [BUILD] second`)
+
+    expect(report.batchesRemoved).toBe(1)
+    expect(report.text).toBe(`1. [HOOK] first
+
+2. [BUILD] second
+`)
+  })
+
+  it('drops a nano banana label and a part header between hook prompts', () => {
+    const report = formatPrompts(`1. [HOOK] first
+
+**NANO BANANA**
+Part 2 of 4 complete.
+
+2. [BUILD] second`)
+
+    expect(report.text).toBe(`1. [HOOK] first
+
+2. [BUILD] second
+`)
+    expect(report.batchesRemoved).toBe(2)
+    expect(report.text).not.toMatch(/NANO|Part /)
+  })
+
   it('lists missing numbers as collapsed ranges', () => {
     const report = formatPrompts(`1. [HOOK] first
 315. [BUILD] middle
@@ -200,6 +228,35 @@ A highly detailed dramatic chiaroscuro oil colorful painting.
     expect(report.missing).toEqual([])
     expect(report.text).not.toMatch(/Script:|Concept:|Camera:|VISUAL|NANOBANANA/)
   })
+
+  it('drops the visual label when the prompt is on the same line', () => {
+    const report = formatPrompts(`NANO BANANA PROMPT:
+VISUAL 001 asbdbasd
+`)
+
+    expect(report.text).toBe(`1. asbdbasd
+`)
+    expect(report.text).not.toMatch(/VISUAL|NANO/)
+  })
+
+  it('numbers a visual prompt that has no nano label', () => {
+    const report = formatPrompts('VISUAL 001 asbdbasd')
+
+    expect(report.text).toBe(`1. asbdbasd
+`)
+    expect(report.text).not.toMatch(/VISUAL/)
+  })
+
+  it('accepts a spaced nano banana label', () => {
+    const report = formatPrompts(`VISUAL 004
+
+NANO BANANA PROMPT:
+A painted doorway.
+`)
+
+    expect(report.text).toBe(`4. A painted doorway.
+`)
+  })
 })
 
 describe('seg-marked image prompts', () => {
@@ -233,6 +290,51 @@ describe('seg-marked image prompts', () => {
 `)
     expect(report.text).not.toMatch(/\*|SEG |purgatorio|huir/)
     expect(report.missing).toEqual([])
+  })
+
+  it('strips the same SEG marker with the other wraps that already showed up', () => {
+    const report = formatPrompts(
+      `1) **[SEG 004 — "cuarta"]** A fourth painted prompt.
+
+(5) *[SEG 005 | "quinta"]* A fifth painted prompt.
+
+__[SEG 006: "sexta"]__ A sixth painted prompt.
+
+[SEGMENT 007 — "séptima"] A seventh painted prompt.
+
+***[SEG 008 — "octava"]*** An eighth painted prompt.`,
+    )
+
+    expect(report.text).toBe(`4. A fourth painted prompt.
+
+5. A fifth painted prompt.
+
+6. A sixth painted prompt.
+
+7. A seventh painted prompt.
+
+8. An eighth painted prompt.
+`)
+    expect(report.text).not.toMatch(/\[|SEG |\*|cuarta|quinta|sexta|séptima|octava/)
+    expect(report.missing).toEqual([])
+  })
+
+  it('drops batch, nano banana, and visual labels sitting between prompts', () => {
+    const report = formatPrompts(`1. **[SEG 001 — "primera"]** A grand Renaissance fresco.
+
+**Batch 2 of 9**
+NANO BANANA PROMPT:
+VISUAL 009
+━━━━━━━━━━━━━━━━
+
+2. **[SEG 002 — "segunda"]** A chiaroscuro oil painting.`)
+
+    expect(report.text).toBe(`1. A grand Renaissance fresco.
+
+2. A chiaroscuro oil painting.
+`)
+    expect(report.text).not.toMatch(/Batch|NANO|VISUAL|━|primera|segunda/)
+    expect(report.batchesRemoved).toBe(4)
   })
 })
 

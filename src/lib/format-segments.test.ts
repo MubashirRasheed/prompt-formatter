@@ -38,4 +38,18 @@ SEG 02: and felt herself descending`)
 SEG 02: and felt herself descending
 `)
   })
+
+  it('reads the spoken line from bold, dashed, and wrapped headings', () => {
+    const report = formatSegments(`1. **[SEG 001 — "en lugar de huir de él?"]** A painting that should not be kept.
+
+SEG 002 — “segunda frase”
+__SEG 003 | "tercera"__
+CONCEPT: drop this`)
+
+    expect(report.text).toBe(`SEG 01: en lugar de huir de él?
+SEG 02: segunda frase
+SEG 03: tercera
+`)
+    expect(report.text).not.toMatch(/painting|CONCEPT|\[/)
+  })
 })

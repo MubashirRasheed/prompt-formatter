@@ -1,3 +1,5 @@
+import { matchBracketSeg } from './seg-marker'
+
 export type FormatReport = {
   text: string
   count: number
@@ -16,7 +18,22 @@ const PROMPT_SOURCE = `(?<!\\d)(\\d{1,4})\\.\\s*(\\[(?:${TAG})\\])`
 const LINE_PROMPT = new RegExp(`^(\\d{1,4})\\.\\s+\\[(?:${TAG})\\]`, 'i')
 const ANY_NUMBERED = /^(\d{1,4})\.\s/
 const BATCH_SOURCE =
-  '\\*{0,2}\\s*Batch\\s+\\d+\\s+of\\s+\\d+(?:\\s*\\([^)\\n]*\\))?(?:\\s*\\*{1,2})?(?:\\s+complete[.!]?)?\\s*\\*{0,2}'
+  '[*_]*\\s*Batch\\s+\\d+\\s+of\\s+\\d+(?:\\s*\\([^)\\n]*\\))?(?:\\s*[*_]{1,})?(?:\\s+complete[.!]?)?\\s*[*_]*'
+const BATCH_CORE =
+  /^Batch\s+\d+\s+of\s+\d+(?:\s*\([^)\n]*\))?(?:\s+complete[.!]?)?$/i
+const PART_CORE =
+  /^(?:Part|Section)\s+\d+\s+of\s+\d+(?:\s*\([^)\n]*\))?(?:\s+complete[.!]?)?$/i
+const NANO_CORE = /^(?:NANO[\s-]*BANANA|NANOBANANA)(?:\s+PROMPT)?\s*:?$/i
+const VISUAL_CORE = /^VISUAL\s+\d{1,4}$/i
+
+function isDividerLine(line: string): boolean {
+  const trimmed = line.trim()
+  if (!trimmed) return false
+  if (trimmed.length >= 3 && /^[━─—\-_=*]+$/.test(trimmed)) return true
+  const core = trimmed.replace(/^[*_]+/, '').replace(/[*_]+$/, '').trim()
+  if (!core) return false
+  return BATCH_CORE.test(core) || PART_CORE.test(core) || NANO_CORE.test(core) || VISUAL_CORE.test(core)
+}
 
 function stripBatches(raw: string): { text: string; removed: number } {
   let removed = 0
@@ -24,6 +41,10 @@ function stripBatches(raw: string): { text: string; removed: number } {
   const kept: string[] = []
 
   for (const line of lines) {
+    if (isDividerLine(line)) {
+      removed += 1
+      continue
+    }
     const batch = new RegExp(BATCH_SOURCE, 'gi')
     const hits = line.match(batch)
     if (!hits) {
@@ -163,10 +184,8 @@ function collectNumbers(text: string): number[] {
   return numbers
 }
 
-const VISUAL_HEADING = /^VISUAL\s+(\d{1,4})\s*$/i
-const NANO_LABEL = /^NANOBANANA PROMPT:\s*(.*)$/i
-const SEG_MARKED =
-  /^\s*(?:\d{1,4}[.)]\s*)?[*_]*\s*\[\s*SEG\s+(\d{1,4})\s*[—–\-:]*\s*(?:[“"«'][\s\S]*?[”"»']\s*)?\]\s*[*_]*\s*(.*)$/i
+const VISUAL_HEADING = /^[*_]*\s*VISUAL\s+(\d{1,4})\b\s*[*_]*\s*(.*)$/i
+const NANO_LABEL = /^(?:NANO[\s-]*BANANA|NANOBANANA)\s+PROMPT\s*:?\s*(.*)$/i
 
 function isRuleLine(line: string): boolean {
   const trimmed = line.trim()
@@ -195,6 +214,11 @@ function extractVisualPrompts(raw: string): FormatReport | null {
     if (visual) {
       finish()
       visualNumber = Number(visual[1])
+      const rest = visual[2].trim()
+      if (rest) {
+        collecting = true
+        body.push(rest)
+      }
       continue
     }
     if (isRuleLine(trimmed)) {
@@ -242,7 +266,10 @@ function extractVisualPrompts(raw: string): FormatReport | null {
   }
 }
 
-function reportNumbered(prompts: { number: number; text: string }[]): FormatReport {
+function reportNumbered(
+  prompts: { number: number; text: string }[],
+  batchesRemoved = 0,
+): FormatReport {
   const numbers = prompts.map((prompt) => prompt.number)
   const unique = [...new Set(numbers)]
   const low = numbers.length ? Math.min(...numbers) : null
@@ -266,7 +293,7 @@ function reportNumbered(prompts: { number: number; text: string }[]): FormatRepo
     duplicates,
     gluedMoved: 0,
     blanksAdded: 0,
-    batchesRemoved: 0,
+    batchesRemoved,
     spacesAdded: 0,
     numbersAdded: numbers.length,
   }
@@ -274,7 +301,49 @@ function reportNumbered(prompts: { number: number; text: string }[]): FormatRepo
 
 function extractSegMarkedPrompts(raw: string): FormatReport | null {
   const lines = raw.replace(/^\uFEFF/, '').split(/\r?\n/)
-  if (!lines.some((line) => SEG_MARKED.test(line))) return null
+  if (!lines.some((line) => matchBracketSeg(line))) return null
+
+  const prompts: { number: number; text: string }[] = []
+  let current: { number: number; parts: string[] } | null = null
+  let batchesRemoved = 0
+
+  const finish = () => {
+    if (!current) return
+    const text = current.parts.join('\n').trim()
+    if (text) prompts.push({ number: current.number, text })
+    current = null
+  }
+
+  for (const line of lines) {
+    if (isDividerLine(line)) {
+      batchesRemoved += 1
+      continue
+    }
+    const marker = matchBracketSeg(line)
+    if (marker) {
+      finish()
+      current = { number: marker.number, parts: [] }
+      if (marker.rest) current.parts.push(marker.rest)
+      continue
+    }
+    if (!line.trim()) {
+      finish()
+      continue
+    }
+    if (current) current.parts.push(line)
+  }
+  finish()
+
+  return reportNumbered(prompts, batchesRemoved)
+}
+
+function extractInlineVisualPrompts(raw: string): FormatReport | null {
+  const lines = raw.replace(/^\uFEFF/, '').split(/\r?\n/)
+  const inline = lines.some((line) => {
+    const match = line.trim().match(VISUAL_HEADING)
+    return !!match?.[2].trim()
+  })
+  if (!inline) return null
 
   const prompts: { number: number; text: string }[] = []
   let current: { number: number; parts: string[] } | null = null
@@ -287,7 +356,8 @@ function extractSegMarkedPrompts(raw: string): FormatReport | null {
   }
 
   for (const line of lines) {
-    const match = line.match(SEG_MARKED)
+    if (isDividerLine(line)) continue
+    const match = line.trim().match(VISUAL_HEADING)
     if (match) {
       finish()
       current = { number: Number(match[1]), parts: [] }
@@ -305,12 +375,21 @@ function extractSegMarkedPrompts(raw: string): FormatReport | null {
   return reportNumbered(prompts)
 }
 
-export function formatPrompts(raw: string): FormatReport {
-  const visuals = extractVisualPrompts(raw)
-  if (visuals) return visuals
+function hasHookPrompt(raw: string): boolean {
+  if (new RegExp(PROMPT_SOURCE, 'i').test(raw)) return true
+  return raw.split(/\r?\n/).some((line) => new RegExp(`^\\s*\\[(?:${TAG})\\]`, 'i').test(line))
+}
 
+export function formatPrompts(raw: string): FormatReport {
   const segMarked = extractSegMarkedPrompts(raw)
   if (segMarked) return segMarked
+
+  if (!hasHookPrompt(raw)) {
+    const visuals = extractVisualPrompts(raw)
+    if (visuals) return visuals
+    const inlineVisuals = extractInlineVisualPrompts(raw)
+    if (inlineVisuals) return inlineVisuals
+  }
 
   const stripped = stripBatches(raw)
   const numbered = addNumbersIfMissing(stripped.text)

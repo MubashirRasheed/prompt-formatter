@@ -1,14 +1,18 @@
+import { matchBracketSeg } from './seg-marker'
+
 export type ScriptReport = {
   text: string
   tagsRemoved: number
 }
 
-const BRACKET = /\[[^\]\n]*\]/g
+const WRAPPED_TAG = /(?:[*_]+[ \t]*)?\[[^\]\n]*\](?:[ \t]*[*_]+)?/g
 
 export function formatScript(raw: string): ScriptReport {
   let tagsRemoved = 0
-  const stripped = raw.replace(/^\uFEFF/, '').replace(BRACKET, () => {
+  const stripped = raw.replace(/^\uFEFF/, '').replace(WRAPPED_TAG, (hit) => {
     tagsRemoved += 1
+    const marker = matchBracketSeg(hit.trim())
+    if (marker?.quote) return ` ${marker.quote} `
     return ''
   })
 

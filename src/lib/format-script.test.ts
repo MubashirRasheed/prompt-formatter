@@ -26,4 +26,14 @@ Segunda frase.
 `)
     expect(report.tagsRemoved).toBe(3)
   })
+
+  it('drops bold wrappers and keeps the spoken line inside a SEG marker', () => {
+    const report = formatScript(
+      '**[HOOK]** Primera. **[SEG 001 — "La frase dicha,"]** sigue. [CORE REVEAL]',
+    )
+
+    expect(report.text).toBe('Primera. La frase dicha, sigue.\n')
+    expect(report.tagsRemoved).toBe(3)
+    expect(report.text).not.toMatch(/\[|\]|\*/)
+  })
 })

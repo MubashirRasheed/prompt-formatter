@@ -1,3 +1,5 @@
+import { matchSegMarker } from './seg-marker'
+
 export type SegmentReport = {
   text: string
   count: number
@@ -50,10 +52,11 @@ function parseSegmentLines(lines: string[]): Segment[] {
   const segments: Segment[] = []
 
   for (const line of lines) {
-    const trimmed = line.trim()
-    const heading = trimmed.match(/^SEG\s+(\d{1,4})\s*[:|]\s*(.*)$/i)
-    if (!heading) continue
-    segments.push({ number: Number(heading[1]), quote: heading[2] })
+    const marker = matchSegMarker(line)
+    if (!marker) continue
+    const quote = marker.quote || marker.rest
+    if (!quote) continue
+    segments.push({ number: marker.number, quote })
   }
 
   return segments
@@ -89,7 +92,7 @@ function parseVisualSheet(lines: string[]): Segment[] {
 
 export function formatSegments(raw: string): SegmentReport {
   const lines = raw.replace(/^\uFEFF/, '').split(/\r?\n/)
-  const hasSegment = lines.some((line) => /^SEG\s+\d+/i.test(line.trim()))
+  const hasSegment = lines.some((line) => matchSegMarker(line))
   const hasVisual = lines.some((line) => /^VISUAL\s+\d+/i.test(line.trim()))
   const segments = hasSegment ? parseSegmentLines(lines) : hasVisual ? parseVisualSheet(lines) : []
   return reportFrom(segments)

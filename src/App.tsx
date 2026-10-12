@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Download, FileText, Moon, Sun, Upload } from 'lucide-react'
+import { Copy, Download, FileText, Moon, Settings2, Sun, Upload } from 'lucide-react'
 import { buildPdf } from './lib/build-pdf'
 import { downloadName, formatMissing, formatPrompts } from './lib/format-prompts'
 import { formatScript } from './lib/format-script'
 import { formatSegments } from './lib/format-segments'
+import { stripCustomPhrases } from './lib/strip-custom'
 
 const PROMPT_SAMPLE = `1. [HOOK] elbow jabs in2. [HOOK] steam near the ear
 **Batch 4 of 11 (segments 91-120)**
@@ -38,6 +39,11 @@ export default function App() {
   const [scriptFile, setScriptFile] = useState('script.txt')
   const [copied, setCopied] = useState(false)
   const [theme, setTheme] = useState<Theme>('light')
+  const [removeOpen, setRemoveOpen] = useState(false)
+  const [removePresent, setRemovePresent] = useState(false)
+  const [removeShown, setRemoveShown] = useState(false)
+  const [removals, setRemovals] = useState('')
+  const removeRootRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const sourceRef = useRef<HTMLTextAreaElement>(null)
   const outputRef = useRef<HTMLPreElement>(null)
@@ -45,9 +51,18 @@ export default function App() {
   const source =
     mode === 'prompts' ? promptSource : mode === 'segments' ? segmentSource : scriptSource
   const fileName = mode === 'prompts' ? promptFile : mode === 'segments' ? segmentFile : scriptFile
-  const promptReport = useMemo(() => formatPrompts(promptSource), [promptSource])
-  const segmentReport = useMemo(() => formatSegments(segmentSource), [segmentSource])
-  const scriptReport = useMemo(() => formatScript(scriptSource), [scriptSource])
+  const promptReport = useMemo(
+    () => formatPrompts(stripCustomPhrases(promptSource, removals)),
+    [promptSource, removals],
+  )
+  const segmentReport = useMemo(
+    () => formatSegments(stripCustomPhrases(segmentSource, removals)),
+    [segmentSource, removals],
+  )
+  const scriptReport = useMemo(
+    () => formatScript(stripCustomPhrases(scriptSource, removals)),
+    [scriptSource, removals],
+  )
   const outputText =
     mode === 'prompts' ? promptReport.text : mode === 'segments' ? segmentReport.text : scriptReport.text
 
@@ -73,12 +88,41 @@ export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem('prompt-formatter-theme')
     if (saved === 'dark') setTheme('dark')
+    setRemovals(localStorage.getItem('prompt-formatter-remove') ?? '')
   }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.documentElement.style.colorScheme = theme
   }, [theme])
+
+  useEffect(() => {
+    if (!removeOpen) {
+      setRemoveShown(false)
+      return
+    }
+    setRemovePresent(true)
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setRemoveShown(true))
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [removeOpen])
+
+  useEffect(() => {
+    if (removeOpen || !removePresent) return
+    const timer = window.setTimeout(() => setRemovePresent(false), 200)
+    return () => window.clearTimeout(timer)
+  }, [removeOpen, removePresent])
+
+  useEffect(() => {
+    if (!removeOpen) return
+    function onPointerDown(event: PointerEvent) {
+      if (removeRootRef.current?.contains(event.target as Node)) return
+      setRemoveOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [removeOpen])
 
   function toggleTheme() {
     const next: Theme = theme === 'light' ? 'dark' : 'light'
@@ -142,6 +186,41 @@ export default function App() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <div className="relative" ref={removeRootRef}>
+            <button
+              type="button"
+              onClick={() => setRemoveOpen((open) => !open)}
+              aria-expanded={removeOpen}
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-100 dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/5"
+            >
+              <Settings2 className="size-3.5" />
+              Remove
+            </button>
+            {removePresent && (
+              <div
+                className={`absolute top-full right-0 z-20 mt-2 w-80 origin-top-right rounded-xl border border-zinc-200 bg-white p-3 shadow-lg transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none dark:border-white/10 dark:bg-zinc-900 ${
+                  removeShown
+                    ? 'translate-y-0 scale-100 opacity-100'
+                    : 'pointer-events-none -translate-y-1 scale-[0.98] opacity-0'
+                }`}
+              >
+                <label className="block text-xs text-zinc-500 dark:text-zinc-400" htmlFor="remove-phrases">
+                  One phrase per line. A SEG marker matches every number and quote in that shape, not only the one you pasted. Saved in this browser.
+                </label>
+                <textarea
+                  id="remove-phrases"
+                  value={removals}
+                  onChange={(event) => {
+                    setRemovals(event.target.value)
+                    localStorage.setItem('prompt-formatter-remove', event.target.value)
+                  }}
+                  placeholder={'VISUAL 001\nNANO BANANA PROMPT:'}
+                  spellCheck={false}
+                  className="mt-2 h-36 w-full resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-500/70 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-amber-300/60"
+                />
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={toggleTheme}

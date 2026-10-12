@@ -219,6 +219,21 @@ describe('seg-marked image prompts', () => {
     expect(report.range).toEqual([1, 3])
     expect(report.missing).toEqual([2])
   })
+
+  it('strips a bold SEG marker that already sits after a list number', () => {
+    const report = formatPrompts(
+      `1. **[SEG 001 — "¿Por qué querría un alma entrar al purgatorio,"]** A grand Renaissance fresco ceiling colorful painting, variant ARRIVAL.
+
+2. **[SEG 002 — "en lugar de huir de él?"]** A highly detailed dramatic chiaroscuro oil colorful painting.`,
+    )
+
+    expect(report.text).toBe(`1. A grand Renaissance fresco ceiling colorful painting, variant ARRIVAL.
+
+2. A highly detailed dramatic chiaroscuro oil colorful painting.
+`)
+    expect(report.text).not.toMatch(/\*|SEG |purgatorio|huir/)
+    expect(report.missing).toEqual([])
+  })
 })
 
 describe('downloadName', () => {

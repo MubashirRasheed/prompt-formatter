@@ -166,7 +166,7 @@ function collectNumbers(text: string): number[] {
 const VISUAL_HEADING = /^VISUAL\s+(\d{1,4})\s*$/i
 const NANO_LABEL = /^NANOBANANA PROMPT:\s*(.*)$/i
 const SEG_MARKED =
-  /^\s*[*_]*\s*\[\s*SEG\s+(\d{1,4})\s*[—–\-:]*\s*(?:[“"«'][\s\S]*?[”"»']\s*)?\]\s*[*_]*\s*(.*)$/i
+  /^\s*(?:\d{1,4}[.)]\s*)?[*_]*\s*\[\s*SEG\s+(\d{1,4})\s*[—–\-:]*\s*(?:[“"«'][\s\S]*?[”"»']\s*)?\]\s*[*_]*\s*(.*)$/i
 
 function isRuleLine(line: string): boolean {
   const trimmed = line.trim()

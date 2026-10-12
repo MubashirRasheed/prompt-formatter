@@ -207,7 +207,7 @@ describe('seg-marked image prompts', () => {
     const report = formatPrompts(
       `*[SEG 001 — "¿Por qué querría un alma entrar al purgatorio,"]* A grand Renaissance fresco ceiling colorful painting, variant ARRIVAL.
 
-*[SEG 003 — "She knelt at Communion."]* A second painted prompt.`,
+**[SEG 003 — "She knelt at Communion."]** A second painted prompt.`,
     )
 
     expect(report.text).toBe(`1. A grand Renaissance fresco ceiling colorful painting, variant ARRIVAL.

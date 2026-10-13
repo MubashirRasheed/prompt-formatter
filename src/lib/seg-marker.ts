@@ -36,6 +36,11 @@ const PATTERNS: Pattern[] = [
     kind: 'plain',
     re: /^\s*(?:\(\s*\d{1,4}\s*\)|\d{1,4}\s*[.)\-:])?\s*[*_]*\s*SEG(?:MENT)?\s+(\d{1,4})\s*[:|—–\-]+\s*(.*)$/i,
   },
+  // 001 “quote” — CONCEPT: … → S1 | …
+  {
+    kind: 'plain',
+    re: /^\s*[*_]*\s*(\d{1,4})\s*[*_]*\s*[|:—–-]?\s*([“"«].*)$/,
+  },
 ]
 
 function innerQuote(inside: string): string {
@@ -53,9 +58,10 @@ function fromBracket(number: string, inside: string, rest: string): SegMarker {
 
 function fromPlain(number: string, tail: string): SegMarker {
   const cleaned = tail.replace(/\s*[*_]+\s*$/, '').trim()
-  const quoted = cleaned.match(/^[“"«']([^”"»']*)[”"»']\s*(.*)$/)
+  const quoted = cleaned.match(/^(?:“([^”]*)”|"([^"]*)"|«([^»]*)»)\s*(.*)$/)
   if (quoted) {
-    return { number: Number(number), quote: quoted[1].trim(), rest: quoted[2].trim() }
+    const quote = quoted[1] ?? quoted[2] ?? quoted[3] ?? ''
+    return { number: Number(number), quote: quote.trim(), rest: quoted[4].trim() }
   }
   return { number: Number(number), quote: cleaned, rest: '' }
 }

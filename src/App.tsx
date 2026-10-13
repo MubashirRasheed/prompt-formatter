@@ -205,7 +205,7 @@ export default function App() {
                 }`}
               >
                 <label className="block text-xs text-zinc-500 dark:text-zinc-400" htmlFor="remove-phrases">
-                  One phrase per line. A SEG marker matches every number and quote in that shape, not only the one you pasted. Saved in this browser.
+                  One phrase per line. Numbers match any number, so BATCH 6 also removes BATCH 7. A line starting with a label like CONCEPT: removes from that label to the end of every line. Saved in this browser.
                 </label>
                 <textarea
                   id="remove-phrases"

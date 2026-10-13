@@ -39,6 +39,60 @@ SEG 02: and felt herself descending
 `)
   })
 
+  it('reads a line that starts with only a number and a quote', () => {
+    const report = formatSegments(`001 “Santa Gertrudis la Grande escribió que Jesús le dijo exactamente” — CONCEPT: Jesus speaking a command so specific it stops her breath. ANCHOR: Jesus’s lips forming the words, Gertrudis receiving them. Cont.: — (opening). Addr: N. → S1 | EXTREME CLOSE EYES | Warm | M1 | Contrast: n/a (opening)
+
+002 “qué hacer apenas abriera los ojos cada mañana.” — CONCEPT: the instruction is about the very first instant of waking. ANCHOR: eyes just beginning to open. Cont.: Gertrudis’s hands from 001. Addr: N. → S2A | EXTREME CLOSE HANDS | Warm | M3 | Contrast: scale, activity
+
+003 “No le pidió una oración larga,” — CONCEPT: relief that nothing elaborate was demanded. ANCHOR: her face, unburdened. Cont.: same soft dawn light. Addr: N. → S2D (`)
+
+    expect(report.text).toBe(`SEG 01: Santa Gertrudis la Grande escribió que Jesús le dijo exactamente
+SEG 02: qué hacer apenas abriera los ojos cada mañana.
+SEG 03: No le pidió una oración larga,
+`)
+    expect(report.missing).toEqual([])
+  })
+
+  it('reads other numbered shapes without a SEG prefix', () => {
+    const report = formatSegments(`1. “primera frase” — CONCEPT: drop
+(2) "segunda frase" | S2A | Warm
+#3 tercera frase → S1 | EXTREME CLOSE
+Line 4: cuarta frase ANCHOR: drop this
+Scene 5 — «quinta frase»`)
+
+    expect(report.text).toBe(`SEG 01: primera frase
+SEG 02: segunda frase
+SEG 03: tercera frase
+SEG 04: cuarta frase
+SEG 05: quinta frase
+`)
+    expect(report.text).not.toMatch(/CONCEPT|ANCHOR|S2A|EXTREME/)
+  })
+
+  it('takes the spoken line from the line under a bare number', () => {
+    const report = formatSegments(`SEG 007
+“la frase debajo”
+CONCEPT: drop this
+
+008
+CONCEPT: label first
+“otra frase”`)
+
+    expect(report.text).toBe(`SEG 07: la frase debajo
+SEG 08: otra frase
+`)
+  })
+
+  it('numbers quote-only lines in order when nothing is numbered', () => {
+    const report = formatSegments(`“primera” — CONCEPT: drop
+CONCEPT: nothing here
+“segunda” → S1 | Warm`)
+
+    expect(report.text).toBe(`SEG 01: primera
+SEG 02: segunda
+`)
+  })
+
   it('reads the spoken line from bold, dashed, and wrapped headings', () => {
     const report = formatSegments(`1. **[SEG 001 — "en lugar de huir de él?"]** A painting that should not be kept.
 

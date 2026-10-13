@@ -48,17 +48,69 @@ function reportFrom(segments: Segment[]): SegmentReport {
   }
 }
 
+const LABEL =
+  '(?:CONCEPT|ANCHOR|CONTINUITY|CONT|ADDRESS|ADDR|STYLE|CAMERA|NOTES?|MOTION|TEMP|CONTRAST|VISUAL|PROMPT|SHOT|MOOD|ACTION)\\.?\\s*:'
+const LABEL_LINE = new RegExp(`^\\s*(?:[—–\\-→|]\\s*)?${LABEL}`, 'i')
+const LABEL_CUT = new RegExp(`\\s*(?:[—–\\-|]\\s*)?\\b${LABEL}|\\s+→|\\s+\\|`, 'i')
+const NUMBERED_LINE =
+  /^\s*[*_#([]*\s*(?:(?:seg(?:ment)?|scene|shot|line|beat)\s*[-#.]?\s*)?(\d{1,4})\s*[*_)\]]*\s*[.):|—–-]*\s*(.*)$/i
+const FIRST_QUOTE = /“([^”]+)”|"([^"]+)"|«([^»]+)»/
+
+function spokenFrom(rest: string): string {
+  const cut = rest.search(LABEL_CUT)
+  const head = cut >= 0 ? rest.slice(0, cut) : rest
+  const quote = head.match(FIRST_QUOTE)
+  if (quote) return (quote[1] ?? quote[2] ?? quote[3] ?? '').trim()
+  return head.replace(/[\s—–\-|]+$/, '').trim()
+}
+
+function isNoiseLine(line: string): boolean {
+  const trimmed = line.trim()
+  return !trimmed || isRuleLine(trimmed) || LABEL_LINE.test(trimmed)
+}
+
 function parseSegmentLines(lines: string[]): Segment[] {
   const segments: Segment[] = []
+  let pending: number | null = null
 
   for (const line of lines) {
     const marker = matchSegMarker(line)
-    if (!marker) continue
-    const quote = marker.quote || marker.rest
-    if (!quote) continue
-    segments.push({ number: marker.number, quote })
+    if (marker) {
+      pending = null
+      const quote = marker.quote || spokenFrom(marker.rest)
+      if (quote) segments.push({ number: marker.number, quote })
+      continue
+    }
+
+    const numbered = line.match(NUMBERED_LINE)
+    if (numbered && !LABEL_LINE.test(numbered[2])) {
+      const spoken = spokenFrom(numbered[2])
+      if (spoken) {
+        segments.push({ number: Number(numbered[1]), quote: spoken })
+        pending = null
+      } else {
+        pending = Number(numbered[1])
+      }
+      continue
+    }
+
+    if (pending !== null && !isNoiseLine(line)) {
+      const spoken = spokenFrom(line.trim())
+      if (spoken) segments.push({ number: pending, quote: spoken })
+      pending = null
+    }
   }
 
+  return segments
+}
+
+function parseQuotedLines(lines: string[]): Segment[] {
+  const segments: Segment[] = []
+  for (const line of lines) {
+    if (!/^\s*[“"«]/.test(line)) continue
+    const spoken = spokenFrom(line.trim())
+    if (spoken) segments.push({ number: segments.length + 1, quote: spoken })
+  }
   return segments
 }
 
@@ -92,8 +144,13 @@ function parseVisualSheet(lines: string[]): Segment[] {
 
 export function formatSegments(raw: string): SegmentReport {
   const lines = raw.replace(/^\uFEFF/, '').split(/\r?\n/)
-  const hasSegment = lines.some((line) => matchSegMarker(line))
+  const hasMarker = lines.some((line) => matchSegMarker(line))
   const hasVisual = lines.some((line) => /^VISUAL\s+\d+/i.test(line.trim()))
-  const segments = hasSegment ? parseSegmentLines(lines) : hasVisual ? parseVisualSheet(lines) : []
-  return reportFrom(segments)
+  if (hasVisual && !hasMarker) {
+    const visual = parseVisualSheet(lines)
+    if (visual.length) return reportFrom(visual)
+  }
+  const numbered = parseSegmentLines(lines)
+  if (numbered.length) return reportFrom(numbered)
+  return reportFrom(parseQuotedLines(lines))
 }

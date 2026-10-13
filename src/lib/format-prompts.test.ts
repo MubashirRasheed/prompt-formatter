@@ -183,6 +183,81 @@ ___Batch 2 of 4 (segments 1-10)___
 `)
   })
 
+  it('drops BATCH N: Visuals headers and batch done summary lines', () => {
+    const report = formatPrompts(`125. A watercolor bedroom.
+Batch done: visuals 101–125 of 152. Running style count: S1 27 | S2 37 | S3 16 | S4 14 | S5 16 | S6 7.
+
+BATCH 6: Visuals 126–150
+126. A Renaissance oil portrait.
+127. A Renaissance oil interior.
+BATCH 7: Visuals 126–1520
+128. A Renaissance oil low angle.`)
+
+    expect(report.text).toBe(`125. A watercolor bedroom.
+
+126. A Renaissance oil portrait.
+
+127. A Renaissance oil interior.
+
+128. A Renaissance oil low angle.
+`)
+    expect(report.batchesRemoved).toBe(3)
+    expect(report.missing).toEqual([])
+  })
+
+  it('turns other numbering styles into N. and keeps one blank line', () => {
+    const report = formatPrompts(`1) A fresco ceiling.
+(2) A chiaroscuro oil.
+#3 - A Byzantine icon.
+Prompt 4: A watercolor bedroom.
+**5.** A gothic hall.
+6: A Genoa harbor.`)
+
+    expect(report.text).toBe(`1. A fresco ceiling.
+
+2. A chiaroscuro oil.
+
+3. A Byzantine icon.
+
+4. A watercolor bedroom.
+
+5. A gothic hall.
+
+6. A Genoa harbor.
+`)
+    expect(report.missing).toEqual([])
+  })
+
+  it('drops other short header lines between prompts', () => {
+    const report = formatPrompts(`## Visuals 1–30
+1. A fresco ceiling.
+Set 2
+2. A chiaroscuro oil.
+Prompts 31-60 of 152
+3. A Byzantine icon.
+Chunk 4 complete
+4. A watercolor bedroom.`)
+
+    expect(report.text).toBe(`1. A fresco ceiling.
+
+2. A chiaroscuro oil.
+
+3. A Byzantine icon.
+
+4. A watercolor bedroom.
+`)
+    expect(report.batchesRemoved).toBe(4)
+  })
+
+  it('keeps a short prompt that only mentions a number range', () => {
+    const report = formatPrompts(`1. Two kids aged 8–10 by a river.
+2. A crowd of 20 to 30 monks.`)
+
+    expect(report.text).toContain('8–10 by a river')
+    expect(report.text).toContain('20 to 30 monks')
+    expect(report.batchesRemoved).toBe(0)
+  })
+
   it('drops a nano banana label and a part header between hook prompts', () => {
     const report = formatPrompts(`1. [HOOK] first
 

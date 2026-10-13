@@ -19,19 +19,47 @@ const ANY_NUMBERED = /^(\d{1,4})\.\s/
 const BATCH_SOURCE =
   '[*_]*\\s*Batch\\s+\\d+\\s+of\\s+\\d+(?:\\s*\\([^)\\n]*\\))?(?:\\s*[*_]{1,})?(?:\\s+complete[.!]?)?\\s*[*_]*'
 const BATCH_CORE =
-  /^Batch\s+\d+\s+of\s+\d+(?:\s*\([^)\n]*\))?(?:\s+complete[.!]?)?$/i
+  /^Batch\s+(?:\d+\b|done\b).*$/i
 const PART_CORE =
   /^(?:Part|Section)\s+\d+\s+of\s+\d+(?:\s*\([^)\n]*\))?(?:\s+complete[.!]?)?$/i
 const NANO_CORE = /^(?:NANO[\s-]*BANANA|NANOBANANA)(?:\s+PROMPT)?\s*:?$/i
 const VISUAL_CORE = /^VISUAL\s+\d{1,4}$/i
 
+const GROUP_HEADER = /^(?:batch|part|section|chunk|set|group|round)\s*#?\s*\d+\b/i
+const RANGE_HEADER =
+  /^(?:visuals?|prompts?|segments?|scenes?|shots?|images?|frames?)\s*#?\s*\d+\s*(?:[–—-]|to|of)\s*\d+/i
+const RANGE_ANYWHERE = /\b\d+\s*(?:[–—-]|to|of)\s*\d+\b/i
+
 function isDividerLine(line: string): boolean {
   const trimmed = line.trim()
   if (!trimmed) return false
-  if (trimmed.length >= 3 && /^[━─—\-_=*]+$/.test(trimmed)) return true
-  const core = trimmed.replace(/^[*_]+/, '').replace(/[*_]+$/, '').trim()
+  if (trimmed.length >= 3 && /^[━─—\-_=*#]+$/.test(trimmed)) return true
+  const core = trimmed.replace(/^[*_#\s]+/, '').replace(/[*_\s]+$/, '').trim()
   if (!core) return false
-  return BATCH_CORE.test(core) || PART_CORE.test(core) || NANO_CORE.test(core) || VISUAL_CORE.test(core)
+  if (/^\d{1,4}\s*[.)]/.test(core) || new RegExp(`\\[(?:${TAG})\\]`, 'i').test(core)) return false
+  if (BATCH_CORE.test(core) || PART_CORE.test(core) || NANO_CORE.test(core) || VISUAL_CORE.test(core)) {
+    return true
+  }
+  const words = core.split(/\s+/).length
+  if (words > 14 || core.length > 120) return false
+  if (GROUP_HEADER.test(core) || RANGE_HEADER.test(core)) return true
+  if (/^#{1,6}\s/.test(trimmed)) return true
+  return words <= 8 && RANGE_ANYWHERE.test(core) && /\b(?:visuals?|prompts?|segments?|scenes?|shots?|images?|done|complete)\b/i.test(core)
+}
+
+const OTHER_NUMBERING =
+  /^\s*[*_]*\s*(?:#\s*|No\.?\s*|(?:prompt|visual|image|shot|scene)\s*#?\s*)?\(?(\d{1,4})\)?\s*[*_]*\s*(?:[):\-–—]|\.(?=[\s*_]))\s*[*_]*\s*(.+)$/i
+
+function normalizeNumbering(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      if (/^\s*\d{1,4}\./.test(line)) return line
+      const match = line.match(OTHER_NUMBERING)
+      if (!match || /^\d/.test(match[2])) return line
+      return `${Number(match[1])}. ${match[2].trim()}`
+    })
+    .join('\n')
 }
 
 function stripBatches(raw: string): { text: string; removed: number } {
@@ -392,7 +420,7 @@ export function formatPrompts(raw: string): FormatReport {
   }
 
   const stripped = stripBatches(raw)
-  const numbered = addNumbersIfMissing(stripped.text)
+  const numbered = addNumbersIfMissing(normalizeNumbering(stripped.text))
   const split = splitOntoOwnLines(numbered.text)
   const separated = separatePromptLines(split.text)
   const text = separated.text.trim() ? `${separated.text.replace(/\s+$/, '')}\n` : ''

@@ -78,6 +78,21 @@ third block with no tag`)
     expect(blankLinesBetweenPrompts(report.text)).toEqual([1, 1, 1, 1])
   })
 
+  it('puts one blank line between plain numbered prompts', () => {
+    const report = formatPrompts(`1. A stunning Byzantine-Renaissance icon colorful painting.
+2. A highly detailed Renaissance oil colorful painting.
+3. A highly detailed Renaissance oil colorful painting.`)
+
+    expect(report.text).toBe(`1. A stunning Byzantine-Renaissance icon colorful painting.
+
+2. A highly detailed Renaissance oil colorful painting.
+
+3. A highly detailed Renaissance oil colorful painting.
+`)
+    expect(blankLinesBetweenPrompts(report.text)).toEqual([1, 1])
+    expect(report.blanksAdded).toBe(2)
+  })
+
   it('inserts one blank line when numbered prompts are back to back', () => {
     const report = formatPrompts(`1. [HOOK] first
 2. [BUILD] second

@@ -15,7 +15,6 @@ export type FormatReport = {
 
 const TAG = 'HOOK|BUILD|INTERRUPT|PEAK|RESOLVE'
 const PROMPT_SOURCE = `(?<!\\d)(\\d{1,4})\\.\\s*(\\[(?:${TAG})\\])`
-const LINE_PROMPT = new RegExp(`^(\\d{1,4})\\.\\s+\\[(?:${TAG})\\]`, 'i')
 const ANY_NUMBERED = /^(\d{1,4})\.\s/
 const BATCH_SOURCE =
   '[*_]*\\s*Batch\\s+\\d+\\s+of\\s+\\d+(?:\\s*\\([^)\\n]*\\))?(?:\\s*[*_]{1,})?(?:\\s+complete[.!]?)?\\s*[*_]*'
@@ -162,14 +161,15 @@ function separatePromptLines(text: string): { text: string; blanksAdded: number 
   const lines = text.split('\n')
   const out: string[] = []
   let blanksAdded = 0
+  let seenPrompt = false
 
-  for (let i = 0; i < lines.length; i += 1) {
-    out.push(lines[i])
-    const next = lines[i + 1]
-    if (next && LINE_PROMPT.test(lines[i]) && LINE_PROMPT.test(next)) {
+  for (const line of lines) {
+    if (ANY_NUMBERED.test(line) && seenPrompt && out.at(-1) !== '') {
       out.push('')
       blanksAdded += 1
     }
+    if (ANY_NUMBERED.test(line)) seenPrompt = true
+    out.push(line)
   }
 
   return { text: out.join('\n').replace(/\n{3,}/g, '\n\n'), blanksAdded }

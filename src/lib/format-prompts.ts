@@ -50,12 +50,14 @@ function isDividerLine(line: string): boolean {
 const OTHER_NUMBERING =
   /^\s*[*_]*\s*(?:#\s*|No\.?\s*|(?:prompt|visual|image|shot|scene)\s*#?\s*)?\(?(\d{1,4})\)?\s*[*_]*\s*(?:[):\-–—]|\.(?=[\s*_]))\s*[*_]*\s*(.+)$/i
 
+const BARE_INDEX = /^\s*[*_]*\s*(\d{1,4})\s+(.+)$/
+
 function normalizeNumbering(text: string): string {
   return text
     .split('\n')
     .map((line) => {
-      if (/^\s*\d{1,4}\./.test(line)) return line
-      const match = line.match(OTHER_NUMBERING)
+      if (/^\s*\d{1,4}\.\s/.test(line)) return line
+      const match = line.match(OTHER_NUMBERING) ?? line.match(BARE_INDEX)
       if (!match || /^\d/.test(match[2])) return line
       return `${Number(match[1])}. ${match[2].trim()}`
     })

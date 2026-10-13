@@ -205,6 +205,21 @@ BATCH 7: Visuals 126–1520
     expect(report.missing).toEqual([])
   })
 
+  it('does not prefix 1. onto a line that already starts with 001', () => {
+    const report = formatPrompts(`001 “Santa Gertrudis la Grande escribió que Jesús le dijo exactamente”
+002 “qué hacer apenas abriera los ojos cada mañana.”
+003 “No le pidió una oración larga,”`)
+
+    expect(report.text).toBe(`1. “Santa Gertrudis la Grande escribió que Jesús le dijo exactamente”
+
+2. “qué hacer apenas abriera los ojos cada mañana.”
+
+3. “No le pidió una oración larga,”
+`)
+    expect(report.text).not.toMatch(/1\. 001|2\. 002/)
+    expect(report.numbersAdded).toBe(0)
+  })
+
   it('turns other numbering styles into N. and keeps one blank line', () => {
     const report = formatPrompts(`1) A fresco ceiling.
 (2) A chiaroscuro oil.

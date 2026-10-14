@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Download, FileText, Moon, Settings2, Sun, Upload } from 'lucide-react'
+import { Copy, Download, FileText, Moon, Settings2, Sparkles, Sun, Upload } from 'lucide-react'
 import { buildPdf } from './lib/build-pdf'
 import { downloadName, formatMissing, formatPrompts } from './lib/format-prompts'
 import { formatScript } from './lib/format-script'
 import { formatSegments } from './lib/format-segments'
+import { formatWithLlm, fetchLlmStatus, type LlmResult, type LlmStatus } from './lib/llm-client'
 import { stripCustomPhrases } from './lib/strip-custom'
 
 const PROMPT_SAMPLE = `1. [HOOK] elbow jabs in2. [HOOK] steam near the ear
@@ -43,6 +44,11 @@ export default function App() {
   const [removePresent, setRemovePresent] = useState(false)
   const [removeShown, setRemoveShown] = useState(false)
   const [removals, setRemovals] = useState('')
+  const [aiText, setAiText] = useState<string | null>(null)
+  const [aiMeta, setAiMeta] = useState<LlmResult | null>(null)
+  const [aiError, setAiError] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [llmStatus, setLlmStatus] = useState<LlmStatus | null>(null)
   const removeRootRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const sourceRef = useRef<HTMLTextAreaElement>(null)
@@ -63,8 +69,10 @@ export default function App() {
     () => formatScript(stripCustomPhrases(scriptSource, removals)),
     [scriptSource, removals],
   )
-  const outputText =
+  const localText =
     mode === 'prompts' ? promptReport.text : mode === 'segments' ? segmentReport.text : scriptReport.text
+  const strippedSource = useMemo(() => stripCustomPhrases(source, removals), [mode, source, removals])
+  const outputText = aiText ?? localText
 
   function syncScroll(from: 'source' | 'output') {
     const sourceEl = sourceRef.current
@@ -89,7 +97,16 @@ export default function App() {
     const saved = localStorage.getItem('prompt-formatter-theme')
     if (saved === 'dark') setTheme('dark')
     setRemovals(localStorage.getItem('prompt-formatter-remove') ?? '')
+    void fetchLlmStatus()
+      .then(setLlmStatus)
+      .catch(() => setLlmStatus({ configured: false, provider: 'groq', model: '' }))
   }, [])
+
+  useEffect(() => {
+    setAiText(null)
+    setAiMeta(null)
+    setAiError('')
+  }, [mode, source, removals])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -147,6 +164,21 @@ export default function App() {
     const text = await file.text()
     setSource(text.replace(/^\uFEFF/, ''))
     if (file.name) setFileName(file.name)
+  }
+
+  async function runAi() {
+    if (!strippedSource.trim() || aiLoading) return
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const result = await formatWithLlm(mode, strippedSource)
+      setAiText(result.text)
+      setAiMeta(result)
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : 'AI failed')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   async function copyOutput() {
@@ -321,6 +353,20 @@ export default function App() {
             <div className="flex gap-2">
               <button
                 type="button"
+                onClick={() => void runAi()}
+                disabled={!strippedSource.trim() || aiLoading || llmStatus?.configured === false}
+                title={
+                  llmStatus?.configured === false
+                    ? 'Set GROQ_API_KEY in .env on the server'
+                    : 'Format with Groq or local Ollama'
+                }
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-800 hover:bg-zinc-50 disabled:opacity-40 dark:border-white/10 dark:bg-transparent dark:text-zinc-200 dark:hover:bg-white/5"
+              >
+                <Sparkles className="size-3.5" />
+                {aiLoading ? 'AI…' : 'AI'}
+              </button>
+              <button
+                type="button"
                 onClick={() => void copyOutput()}
                 disabled={!outputText}
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-800 hover:bg-zinc-50 disabled:opacity-40 dark:border-white/10 dark:bg-transparent dark:text-zinc-200 dark:hover:bg-white/5"
@@ -382,7 +428,22 @@ export default function App() {
                 />
               </>
             )}
+            {aiMeta && (
+              <Stat
+                label={aiMeta.fromClientCache ? 'AI client cache' : `${aiMeta.provider} cache`}
+                value={
+                  aiMeta.fromClientCache
+                    ? 'hit'
+                    : aiMeta.promptTokens
+                      ? `${aiMeta.cachedTokens}/${aiMeta.promptTokens}`
+                      : aiMeta.model
+                }
+              />
+            )}
           </div>
+          {aiError && (
+            <p className="px-6 pb-3 text-xs text-amber-700 dark:text-amber-200">{aiError}</p>
+          )}
 
           <pre
             ref={outputRef}

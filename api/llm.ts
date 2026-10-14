@@ -1,39 +1,44 @@
-import { envFrom, formatWithProvider, parseLlmRequest, statusPayload } from '../server/llm.ts'
+import {
+  envFrom,
+  formatWithProvider,
+  parseLlmRequest,
+  statusPayload,
+} from '../server/llm.js'
 
-type VercelRes = {
-  setHeader: (name: string, value: string) => void
-  status: (code: number) => { json: (body: unknown) => void }
+export const config = { runtime: 'nodejs' }
+
+function env() {
+  return envFrom(process.env)
 }
 
-export default async function handler(
-  req: { method?: string; body?: unknown },
-  res: VercelRes,
-) {
-  const env = envFrom(process.env)
-  res.setHeader('Cache-Control', 'no-store')
+function json(body: unknown, status = 200) {
+  return Response.json(body, {
+    status,
+    headers: { 'Cache-Control': 'no-store' },
+  })
+}
 
-  if (req.method === 'GET') {
-    res.status(200).json(statusPayload(env))
-    return
-  }
-
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'method not allowed' })
-    return
-  }
-
+export function GET() {
   try {
-    if (env.provider === 'groq' && !env.groqKey) {
-      res.status(503).json({ error: 'GROQ_API_KEY is not set on the server' })
-      return
+    return json(statusPayload(env()))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'status failed'
+    return json({ configured: false, provider: 'groq', model: '', error: message }, 500)
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const current = env()
+    if (current.provider === 'groq' && !current.groqKey) {
+      return json({ error: 'GROQ_API_KEY is not set on the server' }, 503)
     }
-    const parsed = parseLlmRequest(req.body)
-    const result = await formatWithProvider(env, parsed.mode, parsed.source)
-    res.status(200).json(result)
+    const parsed = parseLlmRequest(await request.json())
+    return json(await formatWithProvider(current, parsed.mode, parsed.source))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'llm failed'
     const status =
       message.startsWith('mode') || message.includes('source') || message === 'invalid JSON' ? 400 : 502
-    res.status(status).json({ error: message })
+    return json({ error: message }, status)
   }
 }

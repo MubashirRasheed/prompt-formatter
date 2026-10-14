@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/llm.ts": {
+      "includeFiles": "server/**"
+    }
+  },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

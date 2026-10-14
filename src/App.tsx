@@ -354,10 +354,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => void runAi()}
-                disabled={!strippedSource.trim() || aiLoading || llmStatus?.configured === false}
+                disabled={!strippedSource.trim() || aiLoading}
                 title={
                   llmStatus?.configured === false
-                    ? 'Set GROQ_API_KEY in .env on the server'
+                    ? 'GROQ_API_KEY is missing on the server'
                     : 'Format with Groq or local Ollama'
                 }
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-800 hover:bg-zinc-50 disabled:opacity-40 dark:border-white/10 dark:bg-transparent dark:text-zinc-200 dark:hover:bg-white/5"

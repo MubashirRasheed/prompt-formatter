@@ -54,6 +54,27 @@ third block with no tag`)
 `)
   })
 
+  it('continues numbering when some prompts already have numbers', () => {
+    const report = formatPrompts(`13. A watercolor bedroom.
+14. A Renaissance oil portrait.
+15. A Renaissance oil interior.
+A gothic atmospheric watercolor.
+A stunning Byzantine-Renaissance icon.`)
+
+    expect(report.text).toBe(`13. A watercolor bedroom.
+
+14. A Renaissance oil portrait.
+
+15. A Renaissance oil interior.
+
+16. A gothic atmospheric watercolor.
+
+17. A stunning Byzantine-Renaissance icon.
+`)
+    expect(report.numbersAdded).toBe(2)
+    expect(report.missing).toEqual([])
+  })
+
   it('numbers a bare tag that comes after numbered prompts', () => {
     const report = formatPrompts(`29. [BUILD] first
 

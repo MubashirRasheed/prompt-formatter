@@ -123,33 +123,46 @@ function splitOntoOwnLines(text: string): {
   return { text: out, gluedMoved, spacesAdded }
 }
 
-function numberBareTagLines(text: string): { text: string; numbersAdded: number } {
-  const numberedPrompt = new RegExp(`^\\s*(\\d{1,4})\\.\\s*\\[(?:${TAG})\\]`, 'i')
-  const bareTag = new RegExp(`^\\s*\\[(?:${TAG})\\]`, 'i')
-  const used = new Set<number>()
+function isWrappedContinuation(line: string, previous: string | undefined): boolean {
+  if (!previous || !ANY_NUMBERED.test(previous)) return false
+  const trimmed = line.trim()
+  if (!trimmed) return false
+  return /^[a-zà-öø-ÿ]/.test(trimmed) || /^[,;:]/.test(trimmed)
+}
 
-  for (const line of text.split('\n')) {
-    const match = line.match(numberedPrompt)
+const EXISTING_NUMBER = /^\s*(\d{1,4})\./
+
+function numberRemainingLines(text: string): { text: string; numbersAdded: number } {
+  const used = new Set<number>()
+  const rows = text.split('\n')
+
+  for (const line of rows) {
+    const match = line.match(EXISTING_NUMBER)
     if (match) used.add(Number(match[1]))
   }
 
   let last = 0
   let numbersAdded = 0
-  const lines = text.split('\n').map((line) => {
-    const match = line.match(numberedPrompt)
+  const lines: string[] = []
+  for (const line of rows) {
+    const match = line.match(EXISTING_NUMBER)
     if (match) {
       last = Number(match[1])
-      return line
+      lines.push(line)
+      continue
     }
-    if (!bareTag.test(line)) return line
+    if (!line.trim() || isWrappedContinuation(line, lines.at(-1))) {
+      lines.push(line)
+      continue
+    }
 
     let next = last + 1
     while (used.has(next)) next += 1
     used.add(next)
     last = next
     numbersAdded += 1
-    return `${next}. ${line.trim()}`
-  })
+    lines.push(`${next}. ${line.trim()}`)
+  }
 
   return { text: lines.join('\n'), numbersAdded }
 }
@@ -158,7 +171,7 @@ function addNumbersIfMissing(text: string): { text: string; numbersAdded: number
   const already =
     new RegExp(PROMPT_SOURCE, 'i').test(text) ||
     text.split('\n').some((line) => /^\s*\d{1,4}\./.test(line))
-  if (already) return numberBareTagLines(text)
+  if (already) return numberRemainingLines(text)
 
   const lines = text.split('\n')
   const tagStart = new RegExp(`^\\s*\\[(?:${TAG})\\]`, 'i')

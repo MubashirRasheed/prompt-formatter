@@ -99,6 +99,28 @@ A stunning Byzantine-Renaissance icon.`)
     expect(blankLinesBetweenPrompts(report.text)).toEqual([1, 1, 1, 1])
   })
 
+  it('renumbers from 1 when a list finishes and starts over at 1', () => {
+    const report = formatPrompts(`23. A Renaissance oil portrait.
+24. A Renaissance oil interior.
+25. A gothic atmospheric watercolor.
+1. A stunning Byzantine-Renaissance icon.
+2. A highly detailed Renaissance oil.`)
+
+    expect(report.text).toBe(`1. A Renaissance oil portrait.
+
+2. A Renaissance oil interior.
+
+3. A gothic atmospheric watercolor.
+
+4. A stunning Byzantine-Renaissance icon.
+
+5. A highly detailed Renaissance oil.
+`)
+    expect(report.range).toEqual([1, 5])
+    expect(report.duplicates).toEqual([])
+    expect(report.missing).toEqual([])
+  })
+
   it('puts one blank line between plain numbered prompts', () => {
     const report = formatPrompts(`1. A stunning Byzantine-Renaissance icon colorful painting.
 2. A highly detailed Renaissance oil colorful painting.

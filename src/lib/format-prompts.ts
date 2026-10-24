@@ -221,10 +221,26 @@ function separatePromptLines(text: string): { text: string; blanksAdded: number 
 function collectNumbers(text: string): number[] {
   const numbers: number[] = []
   for (const line of text.split('\n')) {
-    const match = line.match(ANY_NUMBERED)
+    const match = line.match(EXISTING_NUMBER)
     if (match) numbers.push(Number(match[1]))
   }
   return numbers
+}
+
+function numberingRestarted(numbers: number[]): boolean {
+  return numbers.some((number, index) => index > 0 && number <= numbers[index - 1])
+}
+
+function renumberFromOne(text: string): string {
+  let next = 0
+  return text
+    .split('\n')
+    .map((line) => {
+      if (!EXISTING_NUMBER.test(line)) return line
+      next += 1
+      return line.replace(EXISTING_NUMBER, `${next}.`)
+    })
+    .join('\n')
 }
 
 const VISUAL_HEADING = /^[*_]*\s*VISUAL\s+(\d{1,4})\b\s*[*_]*\s*(.*)$/i
@@ -437,7 +453,10 @@ export function formatPrompts(raw: string): FormatReport {
   const stripped = stripBatches(raw)
   const numbered = addNumbersIfMissing(normalizeNumbering(stripped.text))
   const split = splitOntoOwnLines(numbered.text)
-  const separated = separatePromptLines(split.text)
+  const sequential = numberingRestarted(collectNumbers(split.text))
+    ? renumberFromOne(split.text)
+    : split.text
+  const separated = separatePromptLines(sequential)
   const text = separated.text.trim() ? `${separated.text.replace(/\s+$/, '')}\n` : ''
   const numbers = collectNumbers(text)
   const unique = [...new Set(numbers)]

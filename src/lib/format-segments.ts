@@ -114,6 +114,28 @@ function parseQuotedLines(lines: string[]): Segment[] {
   return segments
 }
 
+function parseProseParagraphs(lines: string[]): Segment[] {
+  const segments: Segment[] = []
+  let current: string[] = []
+
+  const flush = () => {
+    const quote = current.join(' ').replace(/\s+/g, ' ').trim()
+    current = []
+    if (quote) segments.push({ number: segments.length + 1, quote })
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || isRuleLine(trimmed)) {
+      flush()
+      continue
+    }
+    current.push(trimmed)
+  }
+  flush()
+  return segments
+}
+
 function parseVisualSheet(lines: string[]): Segment[] {
   const segments: Segment[] = []
   let number: number | null = null
@@ -152,5 +174,7 @@ export function formatSegments(raw: string): SegmentReport {
   }
   const numbered = parseSegmentLines(lines)
   if (numbered.length) return reportFrom(numbered)
-  return reportFrom(parseQuotedLines(lines))
+  const quoted = parseQuotedLines(lines)
+  if (quoted.length) return reportFrom(quoted)
+  return reportFrom(parseProseParagraphs(lines))
 }

@@ -101,6 +101,22 @@ SEG 03: Esto no es una metáfora piadosa.
     expect(report.missing).toEqual([])
   })
 
+  it('splits wrapped narration into sentences when there is no blank line', () => {
+    const report = formatSegments(`Un muchacho del Oratorio de Turín caminaba hacia una decisión
+que podía hundir su alma, y no lo sabía.
+Esa misma noche, San Juan Bosco lo vio en sueños:
+vio al Ángel de la Guarda del joven interponerse
+justo antes de que cayera, deteniendo lo que parecía ya decidido.
+Esto no es una metáfora piadosa. Quedó registrado en las Memorias.`)
+
+    expect(report.text).toBe(`SEG 01: Un muchacho del Oratorio de Turín caminaba hacia una decisión que podía hundir su alma, y no lo sabía.
+SEG 02: Esa misma noche, San Juan Bosco lo vio en sueños: vio al Ángel de la Guarda del joven interponerse justo antes de que cayera, deteniendo lo que parecía ya decidido.
+SEG 03: Esto no es una metáfora piadosa.
+SEG 04: Quedó registrado en las Memorias.
+`)
+    expect(report.count).toBe(4)
+  })
+
   it('numbers quote-only lines in order when nothing is numbered', () => {
     const report = formatSegments(`“primera” — CONCEPT: drop
 CONCEPT: nothing here

@@ -114,6 +114,13 @@ function parseQuotedLines(lines: string[]): Segment[] {
   return segments
 }
 
+function splitSentences(paragraph: string): string[] {
+  return paragraph
+    .split(/(?<=[.!?…])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
 function parseProseParagraphs(lines: string[]): Segment[] {
   const segments: Segment[] = []
   let current: string[] = []
@@ -121,7 +128,9 @@ function parseProseParagraphs(lines: string[]): Segment[] {
   const flush = () => {
     const quote = current.join(' ').replace(/\s+/g, ' ').trim()
     current = []
-    if (quote) segments.push({ number: segments.length + 1, quote })
+    for (const sentence of splitSentences(quote)) {
+      segments.push({ number: segments.length + 1, quote: sentence })
+    }
   }
 
   for (const line of lines) {

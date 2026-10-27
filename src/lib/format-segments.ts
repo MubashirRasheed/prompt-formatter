@@ -54,6 +54,7 @@ const LABEL_LINE = new RegExp(`^\\s*(?:[—–\\-→|]\\s*)?${LABEL}`, 'i')
 const LABEL_CUT = new RegExp(`\\s*(?:[—–\\-|]\\s*)?\\b${LABEL}|\\s+→|\\s+\\|`, 'i')
 const NUMBERED_LINE =
   /^\s*[*_#([]*\s*(?:(?:seg(?:ment)?|scene|shot|line|beat)\s*[-#.]?\s*)?(\d{1,4})\s*[*_)\]]*\s*[.):|—–-]*\s*(.*)$/i
+const SHOT_LINE = /^\s*[*_]*\s*S\s*(\d{1,4})\s*[:.|—–-]\s*(.*)$/i
 const FIRST_QUOTE = /“([^”]+)”|"([^"]+)"|«([^»]+)»/
 
 function spokenFrom(rest: string): string {
@@ -79,6 +80,14 @@ function parseSegmentLines(lines: string[]): Segment[] {
       pending = null
       const quote = marker.quote || spokenFrom(marker.rest)
       if (quote) segments.push({ number: marker.number, quote })
+      continue
+    }
+
+    const shot = line.match(SHOT_LINE)
+    if (shot) {
+      pending = null
+      const quote = spokenFrom(shot[2]).replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/\s{2,}/g, ' ').trim()
+      if (quote) segments.push({ number: Number(shot[1]), quote })
       continue
     }
 

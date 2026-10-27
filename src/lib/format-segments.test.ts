@@ -39,6 +39,23 @@ SEG 02: and felt herself descending
 `)
   })
 
+  it('keeps only the spoken quote from S01 camera rows', () => {
+    const report = formatSegments(`S01: "Hay costumbres que practicamos en la fe desde" — Identificación cálida con costumbre heredada | E1 | Plano medio | Cálido | M1 | Primero, sin comparación
+S06: "No te sientas mal por esto —" — Alivio de saber que no hay culpa | E1 | Primer plano rostro | Cálido | M1 | Peso tonal+Temp
+S29: ""Por tanto, nadie os juzgue en comida o en bebida," — Palabras bíblicas iluminando un rollo antiguo | E1 | Primer plano (manos/texto) | Cálido | M7 | Escala+Actividad
+S98: "pero puede convertirse en distancia." [PAUSA] — Momento justo antes de una verdad incómoda | E1 | Ángulo bajo | Cálido | M1 | Peso tonal+Temp
+CONCLUSIÓN (28 seg.)
+S156: "Repasemos brevemente: la fecha de Navidad" — Repaso visual de la primera tradición | E1 | Plano medio | Cálido | M1 | Escala+Mov`)
+
+    expect(report.text).toBe(`SEG 01: Hay costumbres que practicamos en la fe desde
+SEG 06: No te sientas mal por esto —
+SEG 29: Por tanto, nadie os juzgue en comida o en bebida,
+SEG 98: pero puede convertirse en distancia.
+SEG 156: Repasemos brevemente: la fecha de Navidad
+`)
+    expect(report.text).not.toMatch(/Identificación|Plano medio|PAUSA|CONCLUSIÓN/)
+  })
+
   it('reads a line that starts with only a number and a quote', () => {
     const report = formatSegments(`001 “Santa Gertrudis la Grande escribió que Jesús le dijo exactamente” — CONCEPT: Jesus speaking a command so specific it stops her breath. ANCHOR: Jesus’s lips forming the words, Gertrudis receiving them. Cont.: — (opening). Addr: N. → S1 | EXTREME CLOSE EYES | Warm | M1 | Contrast: n/a (opening)
 

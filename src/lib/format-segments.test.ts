@@ -56,6 +56,24 @@ SEG 156: Repasemos brevemente: la fecha de Navidad
     expect(report.text).not.toMatch(/Identificación|Plano medio|PAUSA|CONCLUSIÓN/)
   })
 
+  it('keeps the spoken line from V1 rows and drops section headers', () => {
+    const report = formatSegments(`🔹 INTRODUCCIÓN (V1–V19)
+V1 | "Puede que estés leyendo tu Biblia cada mañana," — Devoción matutina tranquila, rutina sagrada. | E1 | Plano medio | M1 | Cálido | —
+V3 | "a tu comunidad de fe — y aun así sentir" — Pertenencia comunitaria visible pero algo falta. | E1 | Plano medio-amplio | M2 | Cálido | Escala, Entorno
+V23 | "El Salmo 46:10 dice: "Estad quietos,"" — La luz entra donde el ruido se detiene. | E1 | Plano amplio | M2 | Dorado | Peso tonal, Escala
+V56 | ""Orad sin cesar." No se trata de orar literalmente" — Escucha atenta en presencia cálida. | E1 | Por encima del hombro | M7 | Cálido | Cámara, Movimiento
+🔹 PUNTO 4 — AISLAMIENTO [PAUSA] (V71–V87)
+V73 | "Decir "puedo adorar a Dios solo,"" — La falsa seguridad en la mirada evasiva. | E1 | Primer plano | M1 | Cálido | Peso tonal, Escala`)
+
+    expect(report.text).toBe(`SEG 01: Puede que estés leyendo tu Biblia cada mañana,
+SEG 03: a tu comunidad de fe — y aun así sentir
+SEG 23: El Salmo 46:10 dice: "Estad quietos,"
+SEG 56: "Orad sin cesar." No se trata de orar literalmente
+SEG 73: Decir "puedo adorar a Dios solo,"
+`)
+    expect(report.text).not.toMatch(/INTRODUCCIÓN|Devoción|Plano medio|AISLAMIENTO|E1/)
+  })
+
   it('reads a line that starts with only a number and a quote', () => {
     const report = formatSegments(`001 “Santa Gertrudis la Grande escribió que Jesús le dijo exactamente” — CONCEPT: Jesus speaking a command so specific it stops her breath. ANCHOR: Jesus’s lips forming the words, Gertrudis receiving them. Cont.: — (opening). Addr: N. → S1 | EXTREME CLOSE EYES | Warm | M1 | Contrast: n/a (opening)
 

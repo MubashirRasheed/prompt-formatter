@@ -17,7 +17,14 @@ function pad(number: number): string {
 }
 
 function spoken(text: string): string {
-  return text.trim().replace(/^[“"]+|[”"]+$/g, '').trim()
+  let trimmed = text.trim()
+  const wrap = /^[“"«]([\s\S]*)[”"»]$/
+  let match = trimmed.match(wrap)
+  while (match) {
+    trimmed = match[1].trim()
+    match = trimmed.match(wrap)
+  }
+  return trimmed
 }
 
 function isRuleLine(line: string): boolean {
@@ -54,8 +61,22 @@ const LABEL_LINE = new RegExp(`^\\s*(?:[—–\\-→|]\\s*)?${LABEL}`, 'i')
 const LABEL_CUT = new RegExp(`\\s*(?:[—–\\-|]\\s*)?\\b${LABEL}|\\s+→|\\s+\\|`, 'i')
 const NUMBERED_LINE =
   /^\s*[*_#([]*\s*(?:(?:seg(?:ment)?|scene|shot|line|beat)\s*[-#.]?\s*)?(\d{1,4})\s*[*_)\]]*\s*[.):|—–-]*\s*(.*)$/i
-const SHOT_LINE = /^\s*[*_]*\s*S\s*(\d{1,4})\s*[:.|—–-]\s*(.*)$/i
+const SHOT_LINE = /^\s*[*_]*\s*([A-Za-z])\s*(\d{1,4})\s*[:.|—–-]+\s*(.*)$/i
 const FIRST_QUOTE = /“([^”]+)”|"([^"]+)"|«([^»]+)»/
+
+function extractShotQuote(rest: string): string {
+  const trimmed = rest.trim()
+  const match = trimmed.match(/^[“"«]([\s\S]*?)[”"»]\s*(?:\[[^\]]*\]\s*)?(?=[—–-])/)
+  if (!match) return spokenFrom(trimmed).replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/\s{2,}/g, ' ').trim()
+
+  let quote = match[1].trim()
+  if (/^[“"«]/.test(quote)) {
+    const open = quote[0]
+    const close = open === '«' ? '»' : open === '“' ? '”' : '"'
+    if (!quote.slice(1).includes(close)) quote = quote.slice(1).trim()
+  }
+  return quote.replace(/\s{2,}/g, ' ').trim()
+}
 
 function spokenFrom(rest: string): string {
   const cut = rest.search(LABEL_CUT)
@@ -86,8 +107,8 @@ function parseSegmentLines(lines: string[]): Segment[] {
     const shot = line.match(SHOT_LINE)
     if (shot) {
       pending = null
-      const quote = spokenFrom(shot[2]).replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/\s{2,}/g, ' ').trim()
-      if (quote) segments.push({ number: Number(shot[1]), quote })
+      const quote = extractShotQuote(shot[3])
+      if (quote) segments.push({ number: Number(shot[2]), quote })
       continue
     }
 

@@ -56,6 +56,25 @@ SEG 156: Repasemos brevemente: la fecha de Navidad
     expect(report.text).not.toMatch(/Identificación|Plano medio|PAUSA|CONCLUSIÓN/)
   })
 
+  it('keeps only the spoken line from timed SEGMENT rows', () => {
+    const report = formatSegments(`# UNVEILED HEAVENS · TASK 3 · Segment list (SEG 001–147)
+What St. John of the Cross Saw When God Went Silent
+
+SEGMENT 001 [0:00] (6 words): St. John of the Cross taught
+SEGMENT 010 [0:36] (11 words): about the hardest stretch of a prayer life. The warmth goes.  ⚠ 11 words, no clean 10-word split
+SEGMENT 015 [0:56] (10 words): he gives this very darkness a name: "O guiding night!
+SEGMENT 045 [2:56] (9 words): "Where have you hidden, Beloved, and left me moaning?"
+TOTAL SEGMENTS: 147
+ESTIMATED VIDEO DURATION: 147 × 4 s ÷ 60 = 9.8 minutes`)
+
+    expect(report.text).toBe(`SEG 01: St. John of the Cross taught
+SEG 10: about the hardest stretch of a prayer life. The warmth goes.
+SEG 15: he gives this very darkness a name: "O guiding night!
+SEG 45: "Where have you hidden, Beloved, and left me moaning?"
+`)
+    expect(report.text).not.toMatch(/\[0:|words|⚠|UNVEILED|TOTAL SEGMENTS|DURATION/)
+  })
+
   it('keeps the spoken line from V1 rows and drops section headers', () => {
     const report = formatSegments(`🔹 INTRODUCCIÓN (V1–V19)
 V1 | "Puede que estés leyendo tu Biblia cada mañana," — Devoción matutina tranquila, rutina sagrada. | E1 | Plano medio | M1 | Cálido | —

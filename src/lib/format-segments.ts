@@ -17,14 +17,7 @@ function pad(number: number): string {
 }
 
 function spoken(text: string): string {
-  let trimmed = text.trim()
-  const wrap = /^[“"«]([\s\S]*)[”"»]$/
-  let match = trimmed.match(wrap)
-  while (match) {
-    trimmed = match[1].trim()
-    match = trimmed.match(wrap)
-  }
-  return trimmed
+  return text.trim()
 }
 
 function isRuleLine(line: string): boolean {
@@ -61,6 +54,8 @@ const LABEL_LINE = new RegExp(`^\\s*(?:[—–\\-→|]\\s*)?${LABEL}`, 'i')
 const LABEL_CUT = new RegExp(`\\s*(?:[—–\\-|]\\s*)?\\b${LABEL}|\\s+→|\\s+\\|`, 'i')
 const NUMBERED_LINE =
   /^\s*[*_#([]*\s*(?:(?:seg(?:ment)?|scene|shot|line|beat)\s*[-#.]?\s*)?(\d{1,4})\s*[*_)\]]*\s*[.):|—–-]*\s*(.*)$/i
+const TIMED_SEGMENT =
+  /^\s*[*_#]*\s*SEG(?:MENT)?\s+(\d{1,4})\b\s*(?:\[[^\]]*\]\s*)?(?:\(\s*\d+\s*words?\s*\)\s*)?:\s*(.*)$/i
 const SHOT_LINE = /^\s*[*_]*\s*([A-Za-z])\s*(\d{1,4})\s*[:.|—–-]+\s*(.*)$/i
 const FIRST_QUOTE = /“([^”]+)”|"([^"]+)"|«([^»]+)»/
 
@@ -96,6 +91,14 @@ function parseSegmentLines(lines: string[]): Segment[] {
   let pending: number | null = null
 
   for (const line of lines) {
+    const timed = line.match(TIMED_SEGMENT)
+    if (timed) {
+      pending = null
+      const quote = timed[2].replace(/\s*⚠.*$/, '').replace(/\s+/g, ' ').trim()
+      if (quote) segments.push({ number: Number(timed[1]), quote })
+      continue
+    }
+
     const marker = matchSegMarker(line)
     if (marker) {
       pending = null
